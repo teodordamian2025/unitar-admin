@@ -34,7 +34,8 @@ export async function POST(request: NextRequest) {
       destinatari,
       template_folosit,
       trimis_de,
-      trimis_de_nume
+      trimis_de_nume,
+      attachments
     } = body;
 
     // Validări
@@ -79,12 +80,23 @@ export async function POST(request: NextRequest) {
       subiect
     );
 
+    // Pregătește atașamentele pentru nodemailer
+    const nodemailerAttachments = attachments && Array.isArray(attachments)
+      ? attachments.map((att: { filename: string; content: string; contentType: string }) => ({
+          filename: att.filename,
+          content: att.content,
+          encoding: 'base64' as const,
+          contentType: att.contentType
+        }))
+      : undefined;
+
     // Trimite email
     const emailResult = await sendEmail({
       to: validEmails,
       subject: subiect.trim(),
       text: continut.trim(),
-      html: htmlContent
+      html: htmlContent,
+      attachments: nodemailerAttachments
     });
 
     // Generează ID unic pentru log
@@ -112,12 +124,14 @@ export async function POST(request: NextRequest) {
     });
 
     if (emailResult.success) {
+      const attachmentCount = nodemailerAttachments?.length || 0;
       return NextResponse.json({
         success: true,
-        message: `Email trimis cu succes către ${validEmails.length} destinatar(i)`,
+        message: `Email trimis cu succes către ${validEmails.length} destinatar(i)${attachmentCount > 0 ? ` cu ${attachmentCount} atașament${attachmentCount > 1 ? 'e' : ''}` : ''}`,
         messageId: emailResult.messageId,
         logId,
         deliveredTo: validEmails,
+        attachmentsCount: attachmentCount,
         invalidEmails: invalidEmails.length > 0 ? invalidEmails : undefined
       });
     } else {

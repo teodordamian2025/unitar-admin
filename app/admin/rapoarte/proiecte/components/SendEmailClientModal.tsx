@@ -6,7 +6,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { toast } from 'react-toastify';
 
 interface Contact {
@@ -52,6 +52,13 @@ interface Sarcina {
   id: string;
   titlu: string;
   status: string;
+}
+
+interface Attachment {
+  name: string;
+  size: number;
+  type: string;
+  content: string; // base64
 }
 
 interface SendEmailClientModalProps {
@@ -149,6 +156,12 @@ export default function SendEmailClientModal({
   const [showHistory, setShowHistory] = useState(false);
   const [emailHistory, setEmailHistory] = useState<EmailLog[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Constante pentru limita de atașamente
+  const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024; // 10MB per fișier
+  const MAX_TOTAL_SIZE = 25 * 1024 * 1024; // 25MB total
 
   // Încarcă contactele când se deschide modalul
   useEffect(() => {
@@ -278,6 +291,83 @@ export default function SendEmailClientModal({
     });
   };
 
+  // Funcții pentru gestionarea atașamentelor
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    const currentTotalSize = attachments.reduce((sum, att) => sum + att.size, 0);
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+
+      // Verificare dimensiune fișier individual
+      if (file.size > MAX_ATTACHMENT_SIZE) {
+        toast.error(`Fișierul "${file.name}" depășește limita de 10MB`);
+        continue;
+      }
+
+      // Verificare dimensiune totală
+      if (currentTotalSize + file.size > MAX_TOTAL_SIZE) {
+        toast.error('Dimensiunea totală a atașamentelor depășește 25MB');
+        break;
+      }
+
+      // Verificare duplicat
+      if (attachments.some(att => att.name === file.name)) {
+        toast.warning(`Fișierul "${file.name}" există deja`);
+        continue;
+      }
+
+      // Convertire la base64
+      try {
+        const base64 = await fileToBase64(file);
+        setAttachments(prev => [...prev, {
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          content: base64
+        }]);
+      } catch (error) {
+        console.error('Eroare la citirea fișierului:', error);
+        toast.error(`Eroare la încărcarea fișierului "${file.name}"`);
+      }
+    }
+
+    // Reset input pentru a permite re-selectarea aceluiași fișier
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => {
+        const result = reader.result as string;
+        // Extrage doar partea base64 (fără "data:...;base64,")
+        const base64 = result.split(',')[1];
+        resolve(base64);
+      };
+      reader.onerror = error => reject(error);
+    });
+  };
+
+  const removeAttachment = (fileName: string) => {
+    setAttachments(prev => prev.filter(att => att.name !== fileName));
+  };
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  };
+
+  const getTotalAttachmentSize = (): number => {
+    return attachments.reduce((sum, att) => sum + att.size, 0);
+  };
+
   const handleSubmit = async () => {
     // Validări
     if (!subiect.trim()) {
@@ -326,15 +416,22 @@ export default function SendEmailClientModal({
           destinatari: Array.from(new Set(allEmails)), // Elimină duplicate
           template_folosit: templateSelectat,
           trimis_de: currentUser?.uid,
-          trimis_de_nume: currentUser?.displayName || currentUser?.email
+          trimis_de_nume: currentUser?.displayName || currentUser?.email,
+          attachments: attachments.length > 0 ? attachments.map(att => ({
+            filename: att.name,
+            content: att.content,
+            contentType: att.type
+          })) : undefined
         })
       });
 
       const result = await response.json();
 
       if (result.success) {
-        toast.success(`Email trimis cu succes către ${result.deliveredTo?.length || 0} destinatar(i)!`);
-        // Refresh istoricul pentru a include noul email
+        const attachmentMsg = attachments.length > 0 ? ` (${attachments.length} atașament${attachments.length > 1 ? 'e' : ''})` : '';
+        toast.success(`Email trimis cu succes către ${result.deliveredTo?.length || 0} destinatar(i)${attachmentMsg}!`);
+        // Reset atașamente și refresh istoric
+        setAttachments([]);
         await loadEmailHistory();
         onClose();
       } else {
@@ -689,6 +786,126 @@ export default function SendEmailClientModal({
                 />
                 <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.75rem', color: '#6b7280' }}>
                   Variabile disponibile: {'{{denumire_proiect}}'}, {'{{client}}'}, {'{{status}}'}, {'{{stadiu_detaliat}}'}
+                </p>
+              </div>
+
+              {/* Atașamente */}
+              <div>
+                <label style={{ display: 'block', fontWeight: '600', color: '#374151', marginBottom: '0.5rem' }}>
+                  Atașamente
+                </label>
+
+                {/* Input fișiere ascuns */}
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileSelect}
+                  multiple
+                  style={{ display: 'none' }}
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.txt,.csv,.zip"
+                />
+
+                {/* Buton adăugare atașament */}
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    padding: '0.75rem 1rem',
+                    background: '#f3f4f6',
+                    border: '1px dashed #9ca3af',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                    color: '#374151',
+                    width: '100%',
+                    justifyContent: 'center',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = '#e5e7eb';
+                    e.currentTarget.style.borderColor = '#6b7280';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = '#f3f4f6';
+                    e.currentTarget.style.borderColor = '#9ca3af';
+                  }}
+                >
+                  📎 Adaugă atașament
+                </button>
+
+                {/* Lista atașamentelor */}
+                {attachments.length > 0 && (
+                  <div style={{
+                    marginTop: '0.75rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.5rem'
+                  }}>
+                    {attachments.map((att) => (
+                      <div
+                        key={att.name}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '0.5rem 0.75rem',
+                          background: '#f0f9ff',
+                          border: '1px solid #bae6fd',
+                          borderRadius: '6px',
+                          fontSize: '0.875rem'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, minWidth: 0 }}>
+                          <span style={{ fontSize: '1.1rem' }}>
+                            {att.type.includes('pdf') ? '📄' :
+                             att.type.includes('image') ? '🖼️' :
+                             att.type.includes('word') || att.type.includes('document') ? '📝' :
+                             att.type.includes('excel') || att.type.includes('spreadsheet') ? '📊' :
+                             att.type.includes('zip') ? '📦' : '📎'}
+                          </span>
+                          <span style={{
+                            color: '#0369a1',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            flex: 1
+                          }}>
+                            {att.name}
+                          </span>
+                          <span style={{ color: '#6b7280', fontSize: '0.75rem', flexShrink: 0 }}>
+                            ({formatFileSize(att.size)})
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeAttachment(att.name)}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            cursor: 'pointer',
+                            padding: '0.25rem',
+                            marginLeft: '0.5rem',
+                            color: '#ef4444',
+                            fontSize: '1rem',
+                            lineHeight: 1
+                          }}
+                          title="Șterge atașamentul"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                    <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: '#6b7280' }}>
+                      Total: {formatFileSize(getTotalAttachmentSize())} / 25 MB
+                    </p>
+                  </div>
+                )}
+
+                <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.75rem', color: '#9ca3af' }}>
+                  Formate acceptate: PDF, Word, Excel, imagini, TXT, CSV, ZIP (max 10MB/fișier, 25MB total)
                 </p>
               </div>
             </div>
