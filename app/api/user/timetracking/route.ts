@@ -97,7 +97,8 @@ export async function GET(request: NextRequest) {
     const userId = searchParams.get('user_id') || 'utilizator_curent';
     const startDate = searchParams.get('start_date');
     const endDate = searchParams.get('end_date');
-    const projectId = searchParams.get('project_id');
+    // FIX: Acceptă ambele variante pentru compatibilitate: proiect_id (standard codebase) sau project_id (legacy)
+    const projectId = searchParams.get('proiect_id') || searchParams.get('project_id');
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '50');
     const offset = (page - 1) * limit;
