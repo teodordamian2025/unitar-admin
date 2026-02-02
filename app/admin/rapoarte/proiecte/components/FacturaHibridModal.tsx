@@ -309,7 +309,14 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   const [setariFacturare, setSetariFacturare] = useState<SetariFacturare | null>(null);
   const [numarFactura, setNumarFactura] = useState(initialData?.numarFactura || '');
   const [serieFactura, setSerieFactura] = useState(initialData?.serieFactura || ''); // ✅ NOU: State pentru serie editabilă
-  const [dataFactura] = useState(new Date());
+  // ✅ MODIFICAT 02.02.2026: Pentru editare, folosește data originală a facturii
+  const [dataFactura] = useState(() => {
+    if (isEdit && initialData?.dataFacturaOriginal) {
+      console.log('📅 [EDIT] Folosesc data originală a facturii:', initialData.dataFacturaOriginal);
+      return new Date(initialData.dataFacturaOriginal);
+    }
+    return new Date();
+  });
   const [isLoadingSetari, setIsLoadingSetari] = useState(false);
   const [isManualNumber, setIsManualNumber] = useState(false); // State pentru editare manuală număr (și la edit)
   const [sendToAnaf, setSendToAnaf] = useState(true); // ✅ Default checked - utilizatorul poate debifa dacă nu dorește transmitere e-Factură
@@ -1805,7 +1812,11 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
           facturaOriginala: isStorno ? initialData?.facturaOriginala : null,
           etapeFacturate, // Etapele pentru update statusuri
           // NOU 02.02.2026: Trimite contractId pentru a lega factura de contract chiar și fără etape selectate
-          contractId: currentContract?.ID_Contract || etapeFacturate[0]?.contract_id || null
+          contractId: currentContract?.ID_Contract || etapeFacturate[0]?.contract_id || null,
+          // ✅ NOU 02.02.2026: Transmite data originală a facturii pentru editare
+          dataFacturaOriginal: isEdit && initialData?.dataFacturaOriginal
+            ? initialData.dataFacturaOriginal
+            : null
         })
       });
       

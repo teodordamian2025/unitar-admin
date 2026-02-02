@@ -473,7 +473,7 @@ export default function EditFacturaModal({
         // Flags pentru edit/storno
         _isEdit: mode === 'edit',
         _isStorno: mode === 'storno',
-        
+
         // Observațiile NU se precompletează, rămân goale
         _initialData: {
           ...dateComplete,
@@ -482,6 +482,10 @@ export default function EditFacturaModal({
           observatii: '', // Gol în loc de dateComplete.observatii
           numarFactura: mode === 'edit' ? factura.numar : null,
           facturaId: mode === 'edit' ? factura.id : null,
+          // ✅ NOU 02.02.2026: Păstrează data facturii originale pentru editare
+          dataFacturaOriginal: typeof factura.data_factura === 'object'
+            ? factura.data_factura.value
+            : factura.data_factura,
           
           proiectId: proiectIdActual,
           proiectInfo: {

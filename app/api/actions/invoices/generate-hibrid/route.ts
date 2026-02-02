@@ -949,7 +949,8 @@ export async function POST(request: NextRequest) {
       facturaId = null,
       facturaOriginala = null,
       etapeFacturate = [], // ✅ NOU: Array cu etapele facturate
-      contractId = null // ✅ NOU 02.02.2026: ID contract pentru facturi directe pe contract
+      contractId = null, // ✅ NOU 02.02.2026: ID contract pentru facturi directe pe contract
+      dataFacturaOriginal = null // ✅ NOU 02.02.2026: Data originală a facturii pentru editare
     } = body;
 
     console.log('📋 Date primite pentru factură:', {
@@ -973,7 +974,8 @@ export async function POST(request: NextRequest) {
         Object.keys(cursuriUtilizate).map(m => `${m}: ${cursuriUtilizate[m].curs?.toFixed(4) || 'N/A'}`).join(', ') :
         'Niciun curs',
       mockMode: MOCK_EFACTURA_MODE && sendToAnaf,
-      fixAplicat: 'Edit_Mode_Support_EtapeFacturi_v2_RaceCondition_Fixed_IAPP_Serie'
+      dataFacturaOriginal: dataFacturaOriginal || 'N/A (va folosi data curentă)', // ✅ NOU 02.02.2026: Log data originală
+      fixAplicat: 'Edit_Mode_Support_EtapeFacturi_v2_RaceCondition_Fixed_IAPP_Serie_DataFacturaOriginal'
     });
 
     // ✅ PĂSTRATE: VALIDĂRI EXISTENTE - păstrate identice
@@ -1474,7 +1476,9 @@ export async function POST(request: NextRequest) {
         <div class="invoice-details">
             <div class="invoice-number">Factura nr: ${numarFacturaDisplay}</div>
             <div class="invoice-meta">
-                <div><strong>Data:</strong> ${new Date().toLocaleDateString('ro-RO')}</div>
+                <div><strong>Data:</strong> ${isEdit && dataFacturaOriginal
+                  ? new Date(dataFacturaOriginal).toLocaleDateString('ro-RO')
+                  : new Date().toLocaleDateString('ro-RO')}</div>
                 ${isEdit ? '<div><strong>Status:</strong> EDITATA</div>' : ''}
                 ${isStorno ? '<div><strong>Tip:</strong> STORNARE</div>' : ''}
                 ${MOCK_EFACTURA_MODE && sendToAnaf ? '<div><strong>MODE:</strong> TEST e-Factura</div>' : ''}
