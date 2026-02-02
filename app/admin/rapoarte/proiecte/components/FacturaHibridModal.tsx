@@ -247,11 +247,39 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   const initialData = proiect._initialData || null;
 
   // State pentru cursuri
-  const [cursuri, setCursuri] = useState<{ [moneda: string]: CursValutar }>({});
-  const [dataCursPersonalizata, setDataCursPersonalizata] = useState(
-    new Date().toISOString().split('T')[0]
-  );
+  // ✅ MODIFICAT 02.02.2026: Pentru editare, folosește cursurile originale din factură
+  const [cursuri, setCursuri] = useState<{ [moneda: string]: CursValutar }>(() => {
+    if (isEdit && initialData?.cursuriUtilizate && Object.keys(initialData.cursuriUtilizate).length > 0) {
+      console.log('💱 [EDIT] Folosesc cursurile originale din factură:', initialData.cursuriUtilizate);
+      // Convertește formatul din initialData la formatul CursValutar
+      const cursuriOriginale: { [moneda: string]: CursValutar } = {};
+      Object.keys(initialData.cursuriUtilizate).forEach(moneda => {
+        const cursData = initialData.cursuriUtilizate[moneda];
+        cursuriOriginale[moneda] = {
+          moneda,
+          curs: cursData.curs || cursData,
+          data: cursData.data || initialData.dataFacturaOriginal || new Date().toISOString().split('T')[0],
+          sursa: 'BD' as const, // Original din factura salvată
+          editabil: true
+        };
+      });
+      return cursuriOriginale;
+    }
+    return {};
+  });
+  // ✅ MODIFICAT 02.02.2026: Pentru editare, folosește data originală a facturii
+  const [dataCursPersonalizata, setDataCursPersonalizata] = useState(() => {
+    if (isEdit && initialData?.dataFacturaOriginal) {
+      console.log('📅 [EDIT] Folosesc data originală pentru cursuri:', initialData.dataFacturaOriginal);
+      return initialData.dataFacturaOriginal;
+    }
+    return new Date().toISOString().split('T')[0];
+  });
   const [loadingCursuri, setLoadingCursuri] = useState(false);
+  // ✅ NOU 02.02.2026: Flag pentru a indica dacă cursurile sunt cele originale din editare
+  const [cursuriOriginaleIncarcate, setCursuriOriginaleIncarcate] = useState(
+    isEdit && initialData?.cursuriUtilizate && Object.keys(initialData.cursuriUtilizate).length > 0
+  );
 
   // MODIFICAT: State pentru etapele de facturare cu compatibilitate EditFacturaModal
   const [liniiFactura, setLiniiFactura] = useState<LineFactura[]>(() => {
@@ -671,19 +699,34 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   }, [proiect, isEdit, initialData]);
 
   // Effect pentru încărcarea cursurilor când se schimbă data
+  // ✅ MODIFICAT 02.02.2026: Skip pentru editare dacă avem cursuri originale încărcate
   useEffect(() => {
+    // Pentru editare cu cursuri originale, NU reîncărcăm automat
+    // Doar reîncărcăm dacă utilizatorul schimbă manual data cursului
+    if (cursuriOriginaleIncarcate) {
+      console.log('📅 [EDIT] Skip reîncărcare cursuri - folosim cursurile originale din factură');
+      return;
+    }
+
     const monede = identificaMonede();
     if (monede.length > 0) {
       loadCursuriPentruData(dataCursPersonalizata, monede);
     }
-  }, [dataCursPersonalizata, etapeDisponibile.length, liniiFactura.length]);
+  }, [dataCursPersonalizata, etapeDisponibile.length, liniiFactura.length, cursuriOriginaleIncarcate]);
 
   // Effect pentru recalcularea liniilor când se schimbă cursurile
   // ✅ FIX STORNARE: Nu recalculăm cursurile pentru stornări - păstrăm valorile identice cu factura originală
+  // ✅ MODIFICAT 02.02.2026: Skip și pentru editare cu cursuri originale
   useEffect(() => {
     // Pentru STORNO, NU recalculăm - păstrăm cursul și valorile din factura originală
     if (isStorno) {
       console.log('↩️ STORNO: Skip recalculare cursuri - păstrăm valorile originale ale facturii');
+      return;
+    }
+
+    // ✅ NOU 02.02.2026: Pentru EDIT cu cursuri originale, NU recalculăm
+    if (isEdit && cursuriOriginaleIncarcate) {
+      console.log('✏️ EDIT: Skip recalculare cursuri - păstrăm cursurile originale ale facturii');
       return;
     }
 
@@ -714,7 +757,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       }
       return linie;
     }));
-  }, [cursuri, isStorno]);
+  }, [cursuri, isStorno, isEdit, cursuriOriginaleIncarcate]);
 
   // FIX PROBLEME 1-3: updateLine cu logică completă pentru valoare/monedă/curs
   // ✅ FIX STORNARE: Blocăm modificările de valoare/monedă/curs pentru storno
@@ -1445,6 +1488,7 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
 
   // SIMPLIFICAT: calculateTotals cu cursuri din state
   // ✅ FIX STORNARE: Pentru storno NU recalculăm cu cursuri noi - păstrăm valorile originale
+  // ✅ MODIFICAT 02.02.2026: Pentru edit cu cursuri originale, NU recalculăm - păstrăm valorile
   const calculateTotals = () => {
     let subtotal = 0;
     let totalTva = 0;
@@ -1453,9 +1497,10 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       const cantitate = Number(linie.cantitate) || 0;
       let pretUnitar = Number(linie.pretUnitar) || 0;
 
-      // Recalculează cu cursul din state DOAR pentru facturi noi/edit, NU pentru storno
-      // Pentru STORNO păstrăm pretUnitar așa cum este (valoarea negativă din factura originală)
-      if (!isStorno && linie.monedaOriginala && linie.monedaOriginala !== 'RON' && linie.valoareOriginala) {
+      // Recalculează cu cursul din state DOAR pentru facturi noi, NU pentru storno/edit cu cursuri originale
+      // Pentru STORNO și EDIT cu cursuri originale păstrăm pretUnitar așa cum este
+      const skipRecalculare = isStorno || (isEdit && cursuriOriginaleIncarcate);
+      if (!skipRecalculare && linie.monedaOriginala && linie.monedaOriginala !== 'RON' && linie.valoareOriginala) {
         const curs = cursuri[linie.monedaOriginala];
         if (curs) {
           pretUnitar = linie.valoareOriginala * curs.curs;
@@ -2732,7 +2777,14 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
               <input
                 type="date"
                 value={dataCursPersonalizata}
-                onChange={(e) => setDataCursPersonalizata(e.target.value)}
+                onChange={(e) => {
+                  setDataCursPersonalizata(e.target.value);
+                  // ✅ NOU 02.02.2026: Când utilizatorul schimbă data manual, permitem reîncărcarea cursurilor
+                  if (cursuriOriginaleIncarcate) {
+                    console.log('📅 [EDIT] Utilizatorul a schimbat data manual - permitem reîncărcarea cursurilor');
+                    setCursuriOriginaleIncarcate(false);
+                  }
+                }}
                 disabled={isLoading}
                 style={{
                   padding: '0.5rem',
@@ -2746,9 +2798,17 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                   ⏳ Se încarcă cursurile...
                 </span>
               )}
+              {/* ✅ NOU 02.02.2026: Indicator pentru cursuri originale în edit mode */}
+              {isEdit && cursuriOriginaleIncarcate && (
+                <span style={{ color: '#27ae60', fontSize: '12px', fontWeight: 'bold' }}>
+                  ✅ Cursuri originale din factură
+                </span>
+              )}
             </div>
             <div style={{ fontSize: '12px', color: '#856404' }}>
-              Cursurile vor fi preluate pentru data selectată. Poți edita manual cursurile în tabel.
+              {isEdit && cursuriOriginaleIncarcate
+                ? 'Cursurile originale din factura inițială sunt păstrate. Schimbă data pentru a prelua cursuri noi.'
+                : 'Cursurile vor fi preluate pentru data selectată. Poți edita manual cursurile în tabel.'}
             </div>
           </div>
 
