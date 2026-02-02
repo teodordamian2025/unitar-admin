@@ -146,6 +146,11 @@ export default function CheltuieliPage() {
   const [showProiectSuggestions, setShowProiectSuggestions] = useState(false);
   const [filteredProiecte, setFilteredProiecte] = useState<Proiect[]>([]);
 
+  // State pentru căutare proiect în modal (adăugare/editare cheltuială)
+  const [modalProiectSearch, setModalProiectSearch] = useState('');
+  const [showModalProiectSuggestions, setShowModalProiectSuggestions] = useState(false);
+  const [modalFilteredProiecte, setModalFilteredProiecte] = useState<Proiect[]>([]);
+
   // Modal states
   const [showModal, setShowModal] = useState(false);
   const [showSubcontractantModal, setShowSubcontractantModal] = useState(false);
@@ -306,6 +311,9 @@ export default function CheltuieliPage() {
       observatii: '',
     });
     setSubproiecte([]);
+    setModalProiectSearch('');
+    setShowModalProiectSuggestions(false);
+    setModalFilteredProiecte([]);
     setShowModal(true);
   }
 
@@ -334,6 +342,17 @@ export default function CheltuieliPage() {
       data_contract_furnizor: formatDateForInput(cheltuiala.data_contract_furnizor),
       observatii: cheltuiala.observatii || '',
     });
+    // Setează valoarea de căutare pentru proiectul existent
+    const proiect = proiecte.find(p => p.ID_Proiect === cheltuiala.proiect_id);
+    if (proiect) {
+      setModalProiectSearch(`${proiect.ID_Proiect} - ${proiect.Denumire}`);
+    } else if (cheltuiala.proiect_id) {
+      setModalProiectSearch(cheltuiala.proiect_denumire || cheltuiala.proiect_id);
+    } else {
+      setModalProiectSearch('');
+    }
+    setShowModalProiectSuggestions(false);
+    setModalFilteredProiecte([]);
     loadSubproiecteForProiect(cheltuiala.proiect_id);
     setShowModal(true);
   }
@@ -545,6 +564,38 @@ export default function CheltuieliPage() {
       subproiect_id: '',
     }));
     loadSubproiecteForProiect(proiectId);
+  }
+
+  // Handle modal proiect search
+  function handleModalProiectSearch(searchValue: string) {
+    setModalProiectSearch(searchValue);
+    if (searchValue.trim().length > 0) {
+      const searchLower = searchValue.toLowerCase();
+      const filtered = proiecte.filter(p =>
+        p.ID_Proiect.toLowerCase().includes(searchLower) ||
+        p.Denumire.toLowerCase().includes(searchLower) ||
+        (p.Client && p.Client.toLowerCase().includes(searchLower))
+      );
+      setModalFilteredProiecte(filtered);
+      setShowModalProiectSuggestions(true);
+    } else {
+      setModalFilteredProiecte(proiecte);
+      setShowModalProiectSuggestions(false);
+    }
+  }
+
+  // Handle modal proiect selection
+  function handleModalProiectSelect(proiect: Proiect) {
+    setModalProiectSearch(`${proiect.ID_Proiect} - ${proiect.Denumire}`);
+    handleProiectChange(proiect.ID_Proiect);
+    setShowModalProiectSuggestions(false);
+  }
+
+  // Clear modal proiect selection
+  function clearModalProiectSelection() {
+    setModalProiectSearch('');
+    handleProiectChange('');
+    setShowModalProiectSuggestions(false);
   }
 
   // Handle proiect filter search
@@ -1155,29 +1206,119 @@ export default function CheltuieliPage() {
               <div style={{ padding: '1.5rem' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
 
-                  {/* Proiect */}
-                  <div>
+                  {/* Proiect - cu autocomplete */}
+                  <div style={{ position: 'relative' }}>
                     <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem' }}>
                       Proiect *
                     </label>
-                    <select
-                      value={formData.proiect_id}
-                      onChange={(e) => handleProiectChange(e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '0.5rem',
+                    <div style={{ display: 'flex', alignItems: 'center', position: 'relative' }}>
+                      <input
+                        type="text"
+                        value={modalProiectSearch}
+                        onChange={(e) => handleModalProiectSearch(e.target.value)}
+                        onFocus={() => {
+                          if (modalProiectSearch.trim().length > 0) {
+                            handleModalProiectSearch(modalProiectSearch);
+                          } else {
+                            setModalFilteredProiecte(proiecte.slice(0, 15));
+                            setShowModalProiectSuggestions(true);
+                          }
+                        }}
+                        onBlur={() => {
+                          setTimeout(() => setShowModalProiectSuggestions(false), 200);
+                        }}
+                        placeholder="Caută după ID, denumire sau client..."
+                        style={{
+                          width: '100%',
+                          padding: '0.5rem',
+                          paddingRight: formData.proiect_id ? '2rem' : '0.5rem',
+                          border: `1px solid ${formData.proiect_id ? '#10b981' : '#d1d5db'}`,
+                          borderRadius: '8px',
+                          fontSize: '0.875rem',
+                          background: formData.proiect_id ? '#f0fdf4' : 'white'
+                        }}
+                      />
+                      {formData.proiect_id && (
+                        <button
+                          type="button"
+                          onClick={clearModalProiectSelection}
+                          style={{
+                            position: 'absolute',
+                            right: '8px',
+                            background: 'transparent',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: '#6b7280',
+                            fontSize: '1rem',
+                            padding: '0 4px',
+                            lineHeight: 1
+                          }}
+                          title="Șterge selecția"
+                        >
+                          ×
+                        </button>
+                      )}
+                    </div>
+                    {/* Dropdown sugestii proiecte în modal */}
+                    {showModalProiectSuggestions && modalFilteredProiecte.length > 0 && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        background: 'white',
                         border: '1px solid #d1d5db',
-                        borderRadius: '8px',
+                        borderTop: 'none',
+                        borderRadius: '0 0 8px 8px',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                        zIndex: 1000,
+                        maxHeight: '200px',
+                        overflowY: 'auto'
+                      }}>
+                        {modalFilteredProiecte.slice(0, 15).map(p => (
+                          <div
+                            key={p.ID_Proiect}
+                            onClick={() => handleModalProiectSelect(p)}
+                            style={{
+                              padding: '0.5rem 0.75rem',
+                              cursor: 'pointer',
+                              fontSize: '0.8rem',
+                              borderBottom: '1px solid #f3f4f6'
+                            }}
+                            onMouseOver={(e) => e.currentTarget.style.background = '#f3f4f6'}
+                            onMouseOut={(e) => e.currentTarget.style.background = 'white'}
+                          >
+                            <div style={{ fontWeight: '600', color: '#3b82f6', fontSize: '0.75rem' }}>
+                              {p.ID_Proiect}
+                            </div>
+                            <div style={{ fontWeight: '500', color: '#1f2937' }}>{p.Denumire}</div>
+                            {p.Client && (
+                              <div style={{ fontSize: '0.7rem', color: '#6b7280' }}>Client: {p.Client}</div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {showModalProiectSuggestions && modalFilteredProiecte.length === 0 && modalProiectSearch.trim().length > 0 && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        background: 'white',
+                        border: '1px solid #d1d5db',
+                        borderTop: 'none',
+                        borderRadius: '0 0 8px 8px',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                        zIndex: 1000,
+                        padding: '0.75rem',
+                        textAlign: 'center',
+                        color: '#6b7280',
                         fontSize: '0.875rem'
-                      }}
-                    >
-                      <option value="">Selectează proiect...</option>
-                      {proiecte.map(p => (
-                        <option key={p.ID_Proiect} value={p.ID_Proiect}>
-                          {p.Denumire} {p.Client ? `(${p.Client})` : ''}
-                        </option>
-                      ))}
-                    </select>
+                      }}>
+                        Nu s-au găsit proiecte pentru "{modalProiectSearch}"
+                      </div>
+                    )}
                   </div>
 
                   {/* Subproiect */}

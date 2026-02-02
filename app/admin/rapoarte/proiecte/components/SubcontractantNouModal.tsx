@@ -1,12 +1,14 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/SubcontractantNouModal.tsx
 // DATA: 19.08.2025 21:50 (ora României)
+// MODIFICAT: 02.02.2026 - Fix z-index + integrare ANAF lookup funcțional
 // DESCRIERE: Modal pentru adăugare subcontractanți noi cu integrare ANAF
 // ==================================================================
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 
 interface SubcontractantNouModalProps {
   isOpen: boolean;
@@ -58,15 +60,23 @@ const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info')
   }, type === 'success' || type === 'error' ? 4000 : 6000);
 };
 
-export default function SubcontractantNouModal({ 
-  isOpen, 
-  onClose, 
+export default function SubcontractantNouModal({
+  isOpen,
+  onClose,
   onSubcontractantAdded,
-  initialData 
+  initialData
 }: SubcontractantNouModalProps) {
   const [loading, setLoading] = useState(false);
   const [showAnafSearch, setShowAnafSearch] = useState(!initialData);
   const [anafData, setAnafData] = useState(initialData || null);
+  const [anafSearchCui, setAnafSearchCui] = useState('');
+  const [anafSearchLoading, setAnafSearchLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  // Necesar pentru createPortal - așteaptă până document este disponibil
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const [formData, setFormData] = useState({
     nume: initialData?.nume || '',
@@ -117,6 +127,44 @@ export default function SubcontractantNouModal({
       onClose();
       resetForm();
     }, 1500);
+  };
+
+  // Căutare ANAF funcțională
+  const searchInANAF = async () => {
+    const cui = anafSearchCui.trim().replace(/^RO/i, '');
+    if (!cui || cui.length < 6) {
+      showToast('Introdu un CUI valid (minim 6 cifre)', 'error');
+      return;
+    }
+
+    setAnafSearchLoading(true);
+    try {
+      const response = await fetch(`/api/anaf/company-info?cui=${encodeURIComponent(cui)}`);
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        const data = result.data;
+        handleAnafDataFound({
+          denumire: data.denumire || '',
+          cui: data.cui || cui,
+          nrRegCom: data.nrRegCom || '',
+          adresa: data.adresa || '',
+          status: data.status || 'N/A',
+          platitorTva: data.platitorTva || 'Nu',
+          judet: data.judet || '',
+          oras: data.oras || '',
+          codPostal: data.codPostal || '',
+          telefon: data.telefon || ''
+        });
+      } else {
+        showToast(result.error || 'CUI-ul nu a fost găsit în ANAF', 'error');
+      }
+    } catch (error: any) {
+      console.error('Eroare căutare ANAF:', error);
+      showToast('Eroare la comunicarea cu ANAF', 'error');
+    } finally {
+      setAnafSearchLoading(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -212,9 +260,9 @@ export default function SubcontractantNouModal({
     setShowAnafSearch(true);
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
-  return (
+  const modalContent = (
     <div style={{
       position: 'fixed',
       top: 0,
@@ -222,7 +270,7 @@ export default function SubcontractantNouModal({
       right: 0,
       bottom: 0,
       background: 'rgba(0,0,0,0.7)',
-      zIndex: 50000,
+      zIndex: 60000,
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -296,16 +344,19 @@ export default function SubcontractantNouModal({
                   🔍 Căutare în ANAF
                 </h4>
                 
-                <div style={{ 
-                  display: 'flex', 
-                  gap: '0.75rem', 
+                <div style={{
+                  display: 'flex',
+                  gap: '0.75rem',
                   marginBottom: '1rem',
                   flexWrap: 'wrap'
                 }}>
                   <div style={{ flex: 1, minWidth: '200px' }}>
                     <input
                       type="text"
+                      value={anafSearchCui}
+                      onChange={(e) => setAnafSearchCui(e.target.value)}
                       placeholder="Introduceți CUI (ex: RO12345678 sau 12345678)"
+                      disabled={anafSearchLoading}
                       style={{
                         width: '100%',
                         padding: '0.75rem',
@@ -313,36 +364,35 @@ export default function SubcontractantNouModal({
                         borderRadius: '8px',
                         fontSize: '14px',
                         fontFamily: 'monospace',
-                        fontWeight: '500'
+                        fontWeight: '500',
+                        background: anafSearchLoading ? '#f8f9fa' : 'white'
                       }}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
-                          const cui = (e.target as HTMLInputElement).value;
-                          if (cui.trim()) {
-                            // Trigger ANAF search
-                            showToast('Funcție ANAF în dezvoltare - folosiți formularul manual', 'info');
-                          }
+                          e.preventDefault();
+                          searchInANAF();
                         }
                       }}
                     />
                   </div>
-                  
+
                   <button
-                    onClick={() => showToast('Funcție ANAF în dezvoltare - folosiți formularul manual', 'info')}
+                    onClick={searchInANAF}
+                    disabled={anafSearchLoading || !anafSearchCui.trim()}
                     style={{
                       padding: '0.75rem 1.5rem',
-                      background: 'linear-gradient(135deg, #3498db 0%, #5dade2 100%)',
+                      background: anafSearchLoading ? '#bdc3c7' : 'linear-gradient(135deg, #3498db 0%, #5dade2 100%)',
                       color: 'white',
                       border: 'none',
                       borderRadius: '8px',
-                      cursor: 'pointer',
+                      cursor: anafSearchLoading ? 'not-allowed' : 'pointer',
                       fontSize: '14px',
                       fontWeight: '600',
                       whiteSpace: 'nowrap',
-                      boxShadow: '0 4px 12px rgba(52, 152, 219, 0.4)'
+                      boxShadow: anafSearchLoading ? 'none' : '0 4px 12px rgba(52, 152, 219, 0.4)'
                     }}
                   >
-                    🔍 Caută în ANAF
+                    {anafSearchLoading ? '⏳ Se caută...' : '🔍 Caută în ANAF'}
                   </button>
                 </div>
               </div>
@@ -833,4 +883,8 @@ export default function SubcontractantNouModal({
       </div>
     </div>
   );
+
+  // Folosim createPortal pentru a monta modalul direct pe document.body
+  // Aceasta rezolvă problema cu z-index când modalul este deschis din alt modal
+  return createPortal(modalContent, document.body);
 }
