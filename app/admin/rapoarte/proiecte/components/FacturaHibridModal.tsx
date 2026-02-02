@@ -326,6 +326,9 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
   // State pentru termen plată editabil
   const [termenPlata, setTermenPlata] = useState(setariFacturare?.termen_plata_standard || 30);
 
+  // NOU 02.02.2026: State pentru contractul curent (pentru a-l trimite la API chiar și când nu sunt selectate etape)
+  const [currentContract, setCurrentContract] = useState<{ID_Contract: string; numar_contract: string} | null>(null);
+
   // NOUĂ: Funcție pentru căutarea contractelor și etapelor (doar pentru generare nouă)
   const findContractAndEtapeForProiect = async (proiectId: string) => {
     try {
@@ -465,12 +468,21 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
     setIsLoadingEtape(true);
     try {
       const { etapeContract, etapeAnexe, contract } = await findContractAndEtapeForProiect(proiectIdFinal);
-      
+
       // Combină toate etapele disponibile
       const toateEtapele = [...etapeContract, ...etapeAnexe];
-      
+
       setEtapeDisponibile(toateEtapele);
-      
+
+      // NOU 02.02.2026: Salvează contractul în state pentru a-l trimite la API
+      if (contract) {
+        setCurrentContract({
+          ID_Contract: contract.ID_Contract,
+          numar_contract: contract.numar_contract
+        });
+        console.log(`📋 [CONTRACT] Contract salvat în state: ${contract.numar_contract} (${contract.ID_Contract})`);
+      }
+
       if (toateEtapele.length > 0) {
         showToast(`📋 Găsite ${toateEtapele.length} etape disponibile pentru facturare`, 'success');
       } else if (contract) {
@@ -1791,7 +1803,9 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
           isStorno,
           facturaId: isEdit ? initialData?.facturaId : null,
           facturaOriginala: isStorno ? initialData?.facturaOriginala : null,
-          etapeFacturate // Etapele pentru update statusuri
+          etapeFacturate, // Etapele pentru update statusuri
+          // NOU 02.02.2026: Trimite contractId pentru a lega factura de contract chiar și fără etape selectate
+          contractId: currentContract?.ID_Contract || etapeFacturate[0]?.contract_id || null
         })
       });
       

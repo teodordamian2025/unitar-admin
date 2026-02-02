@@ -282,7 +282,43 @@ export async function GET(request: NextRequest) {
           ON an.contract_id = co.ID_Contract
         GROUP BY co.proiect_id, co.ID_Contract, co.serie_contract, co.numar_contract, co.tip_document, co.Data_Semnare
       ),
-      -- NOU 26.01.2026: CTE pentru toate facturile unui contract (etape + anexe combinate)
+      -- NOU 02.02.2026: CTE pentru facturi direct pe contract (fără etape selectate)
+      facturi_contract_direct AS (
+        SELECT
+          ef.contract_id,
+          CAST(NULL AS STRING) as subproiect_id,
+          ARRAY_AGG(
+            STRUCT(
+              ef.id as etapa_factura_id,
+              ef.factura_id,
+              CONCAT(fg.serie, '-', fg.numar) as numar_factura,
+              fg.serie as factura_serie,
+              fg.numar as factura_numar,
+              ef.valoare,
+              ef.moneda,
+              ef.valoare_ron,
+              ef.status_incasare,
+              ef.data_facturare,
+              ef.data_incasare,
+              ef.valoare_incasata,
+              fg.data_factura,
+              fg.data_scadenta,
+              fg.total as factura_total,
+              CAST(NULL AS INT64) as etapa_index,
+              CAST('Factură directă pe contract' AS STRING) as etapa_denumire,
+              CAST(NULL AS STRING) as factura_subproiect_id
+            )
+            ORDER BY ef.data_facturare DESC
+          ) as facturi_directe_contract
+        FROM \`${PROJECT_ID}.${dataset}.EtapeFacturi${tableSuffix}\` ef
+        JOIN \`${PROJECT_ID}.${dataset}.FacturiGenerate${tableSuffix}\` fg
+          ON ef.factura_id = fg.id
+        WHERE ef.tip_etapa = 'contract_direct'
+          AND ef.activ = true
+          AND ef.contract_id IS NOT NULL
+        GROUP BY ef.contract_id
+      ),
+      -- NOU 26.01.2026: CTE pentru toate facturile unui contract (etape + anexe + directe combinate)
       contracte_cu_facturi AS (
         SELECT
           cca.proiect_id,
@@ -296,10 +332,13 @@ export async function GET(request: NextRequest) {
             SELECT AS STRUCT * FROM UNNEST(fpc.facturi_etape)
             UNION ALL
             SELECT AS STRUCT * FROM UNNEST(fpa.facturi_anexe)
+            UNION ALL
+            SELECT AS STRUCT * FROM UNNEST(fcd.facturi_directe_contract)
           ) as facturi_contract
         FROM contracte_cu_anexe cca
         LEFT JOIN facturi_per_contract fpc ON fpc.contract_id = cca.ID_Contract
         LEFT JOIN facturi_per_anexa fpa ON fpa.contract_id = cca.ID_Contract
+        LEFT JOIN facturi_contract_direct fcd ON fcd.contract_id = cca.ID_Contract
       ),
       proiecte_cu_contracte AS (
         SELECT

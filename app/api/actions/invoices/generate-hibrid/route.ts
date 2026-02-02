@@ -205,7 +205,7 @@ async function findContractAndEtapeForProiect(proiectId: string) {
 }
 
 // ✅ MODIFICATĂ: Funcție pentru update statusuri etape cu logică corectă pentru Edit Mode
-async function updateEtapeStatusuri(etapeFacturate: EtapaFacturata[], facturaId: string, proiectId: string, isEdit: boolean = false, facturaTotal?: number, facturaMoneda?: string) {
+async function updateEtapeStatusuri(etapeFacturate: EtapaFacturata[], facturaId: string, proiectId: string, isEdit: boolean = false, facturaTotal?: number, facturaMoneda?: string, contractId?: string | null) {
   console.log(`📋 [ETAPE-FACTURI] Actualizare statusuri pentru factura ${facturaId} (Edit Mode: ${isEdit})`);
 
   try {
@@ -252,11 +252,12 @@ async function updateEtapeStatusuri(etapeFacturate: EtapaFacturata[], facturaId:
       });
 
       // ✅ FIX CRUCIAL: Query simplificat cu parametri corecți
+      // ✅ NOU 02.02.2026: Adăugat contract_id pentru legătura directă la contract
       const insertQuery = `
         INSERT INTO ${TABLE_ETAPE_FACTURI}
         (id, proiect_id, etapa_id, anexa_id, tip_etapa, subproiect_id, factura_id,
          valoare, moneda, valoare_ron, curs_valutar, data_curs_valutar, procent_din_etapa,
-         data_facturare, status_incasare, valoare_incasata, activ, versiune, data_creare, creat_de)
+         data_facturare, status_incasare, valoare_incasata, activ, versiune, data_creare, creat_de, contract_id)
         VALUES (
           @etapaFacturaId,
           @proiectId,
@@ -277,7 +278,8 @@ async function updateEtapeStatusuri(etapeFacturate: EtapaFacturata[], facturaId:
           @activ,
           @versiune,
           CURRENT_TIMESTAMP(),
-          @creatDe
+          @creatDe,
+          @contractId
         )
       `;
 
@@ -302,7 +304,8 @@ async function updateEtapeStatusuri(etapeFacturate: EtapaFacturata[], facturaId:
         valoareIncasata: 0,
         activ: true,
         versiune: isEdit ? 2 : 1, // ✅ Versiune diferită pentru Edit vs New
-        creatDe: isEdit ? 'System_Edit' : 'System'
+        creatDe: isEdit ? 'System_Edit' : 'System',
+        contractId: etapa.contract_id || contractId || null // ✅ NOU 02.02.2026: contract_id
       };
 
       // ✅ FIX CRUCIAL: Types corecte pentru BigQuery (STRING pentru DATE conversion)
@@ -325,7 +328,8 @@ async function updateEtapeStatusuri(etapeFacturate: EtapaFacturata[], facturaId:
         valoareIncasata: 'NUMERIC',
         activ: 'BOOL',
         versiune: 'INT64',
-        creatDe: 'STRING'
+        creatDe: 'STRING',
+        contractId: 'STRING' // ✅ NOU 02.02.2026
       };
 
       await bigquery.query({
@@ -454,18 +458,25 @@ async function updateEtapeStatusuri(etapeFacturate: EtapaFacturata[], facturaId:
 
       const etapaFacturaId = `EF_SIMPLE_${facturaId}_${Date.now()}`;
 
+      // ✅ NOU 02.02.2026: Determină tip_etapa bazat pe prezența contractId
+      // 'contract_direct' = factură pe contract fără etape selectate
+      // 'factura_directa' = factură fără niciun contract
+      const tipEtapa = contractId ? 'contract_direct' : 'factura_directa';
+      console.log(`📋 [ETAPE-FACTURI] tip_etapa determinat: ${tipEtapa} (contractId: ${contractId || 'null'})`);
+
       // Insert în EtapeFacturi_v2 cu valori pentru factură simplă
+      // ✅ NOU 02.02.2026: Adăugat contract_id pentru legătura directă la contract
       const insertQuery = `
         INSERT INTO ${TABLE_ETAPE_FACTURI}
         (id, proiect_id, etapa_id, anexa_id, tip_etapa, subproiect_id, factura_id,
          valoare, moneda, valoare_ron, curs_valutar, data_curs_valutar, procent_din_etapa,
-         data_facturare, status_incasare, valoare_incasata, activ, versiune, data_creare, creat_de)
+         data_facturare, status_incasare, valoare_incasata, activ, versiune, data_creare, creat_de, contract_id)
         VALUES (
           @etapaFacturaId,
           @proiectId,
           NULL,
           NULL,
-          'factura_directa',
+          @tipEtapa,
           NULL,
           @facturaId,
           @valoare,
@@ -480,7 +491,8 @@ async function updateEtapeStatusuri(etapeFacturate: EtapaFacturata[], facturaId:
           true,
           1,
           CURRENT_TIMESTAMP(),
-          'System_Generate_Hibrid'
+          'System_Generate_Hibrid',
+          @contractId
         )
       `;
 
@@ -492,7 +504,9 @@ async function updateEtapeStatusuri(etapeFacturate: EtapaFacturata[], facturaId:
           facturaId,
           valoare: facturaTotal,
           moneda: facturaMoneda,
-          valoareRon: facturaTotal // Pentru facturi simple, presupunem că suma este deja în RON
+          valoareRon: facturaTotal, // Pentru facturi simple, presupunem că suma este deja în RON
+          tipEtapa,
+          contractId: contractId || null // ✅ NOU 02.02.2026
         },
         types: {
           etapaFacturaId: 'STRING',
@@ -500,7 +514,9 @@ async function updateEtapeStatusuri(etapeFacturate: EtapaFacturata[], facturaId:
           facturaId: 'STRING',
           valoare: 'NUMERIC',
           moneda: 'STRING',
-          valoareRon: 'NUMERIC'
+          valoareRon: 'NUMERIC',
+          tipEtapa: 'STRING',
+          contractId: 'STRING'
         },
         location: 'EU'
       });
@@ -932,7 +948,8 @@ export async function POST(request: NextRequest) {
       isStorno = false,
       facturaId = null,
       facturaOriginala = null,
-      etapeFacturate = [] // ✅ NOU: Array cu etapele facturate
+      etapeFacturate = [], // ✅ NOU: Array cu etapele facturate
+      contractId = null // ✅ NOU 02.02.2026: ID contract pentru facturi directe pe contract
     } = body;
 
     console.log('📋 Date primite pentru factură:', {
@@ -1924,9 +1941,10 @@ export async function POST(request: NextRequest) {
           proiectId,
           isEdit,
           total, // ✅ Suma totală pentru facturi simple
-          'RON'  // ✅ Moneda pentru facturi simple (suma este calculată în RON)
+          'RON', // ✅ Moneda pentru facturi simple (suma este calculată în RON)
+          contractId // ✅ NOU 02.02.2026: contractId pentru facturi directe pe contract
         );
-        console.log(`✅ [ETAPE-FACTURI] Procesare completă ${isEdit ? '(EDIT MODE)' : '(NEW MODE)'}`);
+        console.log(`✅ [ETAPE-FACTURI] Procesare completă ${isEdit ? '(EDIT MODE)' : '(NEW MODE)'} (contractId: ${contractId || 'null'})`);
         // ✅ Nota: updateProiectStatusFacturare() se apelează AUTOMAT în updateEtapeStatusuri() după actualizarea subproiectelor + 500ms delay
       } catch (etapeError) {
         console.error('❌ [ETAPE-FACTURI] Eroare la procesare:', etapeError);
