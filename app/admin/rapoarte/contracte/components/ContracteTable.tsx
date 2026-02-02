@@ -72,6 +72,8 @@ interface EtapaContract {
   termen_zile: number;
   subproiect_id?: string;
   subproiect_denumire?: string;
+  // NOU 02.02.2026: status_predare din subproiectul pereche
+  status_predare?: string | null;
   status_facturare: string;
   status_incasare: string;
   status_facturare_display: string;
@@ -99,6 +101,8 @@ interface AnexaContract {
   termen_zile: number;
   subproiect_id?: string;
   subproiect_denumire?: string;
+  // NOU 02.02.2026: status_predare din subproiectul pereche
+  status_predare?: string | null;
   status_facturare: string;
   status_incasare: string;
   status_facturare_display: string;
@@ -1523,14 +1527,30 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
                           }}>
                             {formatStatusFacturare(etapa.status_facturare_display)}
                           </td>
-                          {/* NOU 02.02.2026: Coloană Predat pentru etapă (se moștenește de la contract) */}
-                          <td style={{
-                            padding: '0.5rem 0.75rem',
-                            textAlign: 'center',
-                            color: '#7f8c8d',
-                            fontSize: '12px'
-                          }}>
-                            -
+                          {/* NOU 02.02.2026: Coloană Predat pentru etapă (din subproiectul pereche) */}
+                          <td style={{ padding: '0.5rem', textAlign: 'center' }}>
+                            {etapa.status_predare ? (
+                              <span style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                padding: '0.25rem 0.5rem',
+                                borderRadius: '6px',
+                                fontSize: '11px',
+                                fontWeight: '600',
+                                background: etapa.status_predare === 'Predat'
+                                  ? 'rgba(39, 174, 96, 0.15)'
+                                  : 'rgba(243, 156, 18, 0.15)',
+                                color: etapa.status_predare === 'Predat'
+                                  ? '#27ae60'
+                                  : '#f39c12',
+                                border: `1px solid ${etapa.status_predare === 'Predat' ? 'rgba(39, 174, 96, 0.3)' : 'rgba(243, 156, 18, 0.3)'}`
+                              }}>
+                                {etapa.status_predare === 'Predat' ? '✓ Da' : '✗ Nu'}
+                              </span>
+                            ) : (
+                              <span style={{ color: '#7f8c8d', fontSize: '12px' }}>-</span>
+                            )}
                           </td>
                           {/* ✅ ADĂUGAT: Coloană pentru Status etapă (nu are status propriu, afișez "-") */}
                           <td style={{
@@ -1648,14 +1668,30 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
                           }}>
                             {formatStatusFacturare(anexa.status_facturare_display)}
                           </td>
-                          {/* NOU 02.02.2026: Coloană Predat pentru anexă (se moștenește de la contract) */}
-                          <td style={{
-                            padding: '0.5rem 0.75rem',
-                            textAlign: 'center',
-                            color: '#7f8c8d',
-                            fontSize: '12px'
-                          }}>
-                            -
+                          {/* NOU 02.02.2026: Coloană Predat pentru anexă (din subproiectul pereche) */}
+                          <td style={{ padding: '0.5rem', textAlign: 'center' }}>
+                            {anexa.status_predare ? (
+                              <span style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                padding: '0.25rem 0.5rem',
+                                borderRadius: '6px',
+                                fontSize: '11px',
+                                fontWeight: '600',
+                                background: anexa.status_predare === 'Predat'
+                                  ? 'rgba(39, 174, 96, 0.15)'
+                                  : 'rgba(243, 156, 18, 0.15)',
+                                color: anexa.status_predare === 'Predat'
+                                  ? '#27ae60'
+                                  : '#f39c12',
+                                border: `1px solid ${anexa.status_predare === 'Predat' ? 'rgba(39, 174, 96, 0.3)' : 'rgba(243, 156, 18, 0.3)'}`
+                              }}>
+                                {anexa.status_predare === 'Predat' ? '✓ Da' : '✗ Nu'}
+                              </span>
+                            ) : (
+                              <span style={{ color: '#7f8c8d', fontSize: '12px' }}>-</span>
+                            )}
                           </td>
                           {/* ✅ ADĂUGAT: Coloană pentru Status anexă */}
                           <td style={{

@@ -346,6 +346,7 @@ const loadEtapeContractCuFacturi = async (contractId: string) => {
       SELECT
         e.*,
         s.Denumire as subproiect_denumire,
+        s.status_predare as subproiect_status_predare,
         ef.factura_id,
         ef.valoare as valoare_facturata,
         ef.moneda as moneda_facturata,
@@ -391,6 +392,8 @@ const loadEtapeContractCuFacturi = async (contractId: string) => {
           termen_zile: row.termen_zile,
           subproiect_id: row.subproiect_id,
           subproiect_denumire: row.subproiect_denumire,
+          // NOU 02.02.2026: status_predare din subproiectul pereche
+          status_predare: row.subproiect_id ? (row.subproiect_status_predare || 'Nepredat') : null,
           status_facturare: row.status_facturare,
           status_incasare: row.status_incasare,
           data_scadenta: parseDate(row.data_scadenta),
@@ -445,6 +448,7 @@ const loadAnexeContractCuFacturi = async (contractId: string) => {
       SELECT
         a.*,
         s.Denumire as subproiect_denumire,
+        s.status_predare as subproiect_status_predare,
         ef.factura_id,
         ef.valoare as valoare_facturata,
         ef.moneda as moneda_facturata,
@@ -492,6 +496,8 @@ const loadAnexeContractCuFacturi = async (contractId: string) => {
           termen_zile: row.termen_zile,
           subproiect_id: row.subproiect_id,
           subproiect_denumire: row.subproiect_denumire,
+          // NOU 02.02.2026: status_predare din subproiectul pereche
+          status_predare: row.subproiect_id ? (row.subproiect_status_predare || 'Nepredat') : null,
           status_facturare: row.status_facturare,
           status_incasare: row.status_incasare,
           data_scadenta: parseDate(row.data_scadenta),
