@@ -24,9 +24,11 @@ const TABLE_SUBPROIECTE = `\`${PROJECT_ID}.${DATASET}.Subproiecte${tableSuffix}\
 const TABLE_ETAPE_FACTURI = `\`${PROJECT_ID}.${DATASET}.EtapeFacturi${tableSuffix}\``;
 const TABLE_FACTURI_GENERATE = `\`${PROJECT_ID}.${DATASET}.FacturiGenerate${tableSuffix}\``;
 const TABLE_ANEXE_CONTRACT = `\`${PROJECT_ID}.${DATASET}.AnexeContract${tableSuffix}\``;
+// NOU 02.02.2026: Adăugat pentru calculul status_predare
+const TABLE_PROIECTE = `\`${PROJECT_ID}.${DATASET}.Proiecte${tableSuffix}\``;
 
 console.log(`🔧 Contracte API - Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
-console.log(`📊 Using tables: Contracte${tableSuffix}, Clienti${tableSuffix}, EtapeContract${tableSuffix}, Subproiecte${tableSuffix}, EtapeFacturi${tableSuffix}, FacturiGenerate${tableSuffix}, AnexeContract${tableSuffix}`);
+console.log(`📊 Using tables: Contracte${tableSuffix}, Clienti${tableSuffix}, EtapeContract${tableSuffix}, Subproiecte${tableSuffix}, EtapeFacturi${tableSuffix}, FacturiGenerate${tableSuffix}, AnexeContract${tableSuffix}, Proiecte${tableSuffix}`);
 
 const bigquery = new BigQuery({
   projectId: PROJECT_ID,
@@ -273,6 +275,67 @@ const loadFacturiDirecteContract = async (proiectId: string) => {
   } catch (error) {
     console.error(`[CONTRACTE] Eroare la încărcarea facturilor directe pentru proiectul ${proiectId}:`, error);
     return [];
+  }
+};
+
+// NOU 02.02.2026: Calculare status_predare pentru contract
+// Logica: Dacă contractul are anexe legate de subproiecte → verifică status_predare din subproiecte
+//         Dacă nu are anexe/subproiecte → verifică status_predare din proiectul principal
+const calculateStatusPredareContract = async (proiectId: string, anexe: any[]): Promise<string> => {
+  try {
+    // Găsește subproiectele din anexe (cele cu subproiect_id setat)
+    const subproiectIds = Array.from(new Set(
+      anexe
+        .filter(a => a.subproiect_id && a.subproiect_id.trim())
+        .map(a => a.subproiect_id)
+    ));
+
+    if (subproiectIds.length > 0) {
+      // Verifică status_predare pentru toate subproiectele din anexe
+      const subproiecteQuery = `
+        SELECT ID_Subproiect, status_predare
+        FROM ${TABLE_SUBPROIECTE}
+        WHERE ID_Subproiect IN UNNEST(@subproiectIds)
+      `;
+
+      const [subproiecteRows] = await bigquery.query({
+        query: subproiecteQuery,
+        params: { subproiectIds },
+        types: { subproiectIds: ['STRING'] },
+        location: 'EU'
+      });
+
+      // Dacă TOATE subproiectele sunt "Predat" → contract "Predat"
+      // Dacă cel puțin unul nu e predat → contract "Nepredat"
+      const toatePredate = subproiecteRows.length > 0 &&
+        subproiecteRows.every((s: any) => s.status_predare === 'Predat');
+
+      console.log(`[CONTRACTE] Status predare pentru proiect ${proiectId}: ${subproiecteRows.length} subproiecte din anexe, toate predate: ${toatePredate}`);
+      return toatePredate ? 'Predat' : 'Nepredat';
+    }
+
+    // Dacă nu are anexe cu subproiecte, verifică proiectul principal
+    const proiectQuery = `
+      SELECT status_predare
+      FROM ${TABLE_PROIECTE}
+      WHERE ID_Proiect = @proiectId
+      LIMIT 1
+    `;
+
+    const [proiectRows] = await bigquery.query({
+      query: proiectQuery,
+      params: { proiectId },
+      types: { proiectId: 'STRING' },
+      location: 'EU'
+    });
+
+    const statusPredare = proiectRows[0]?.status_predare || 'Nepredat';
+    console.log(`[CONTRACTE] Status predare pentru proiect ${proiectId} (fără subproiecte în anexe): ${statusPredare}`);
+    return statusPredare;
+
+  } catch (error) {
+    console.error(`[CONTRACTE] Eroare la calcularea status_predare pentru proiectul ${proiectId}:`, error);
+    return 'Nepredat';
   }
 };
 
@@ -613,6 +676,9 @@ export async function GET(request: NextRequest) {
       // Încarcă anexele din AnexeContract cu informații de facturare
       const anexe = await loadAnexeContractCuFacturi(contract.ID_Contract);
 
+      // NOU 02.02.2026: Calculează status_predare bazat pe anexe/subproiecte sau proiect
+      const statusPredare = await calculateStatusPredareContract(contract.proiect_id, anexe);
+
       // NOU: Încarcă facturile directe (fără etape/anexe) pentru contract
       const facturiDirecte = await loadFacturiDirecteContract(contract.proiect_id);
 
@@ -669,7 +735,10 @@ export async function GET(request: NextRequest) {
         // NOU: Status facturare general pentru contract
         status_facturare_display: statusFacturareContract.display,
         status_facturare_filtru: statusFacturareContract.status,
-        
+
+        // NOU 02.02.2026: Status predare (bazat pe subproiecte din anexe sau proiect principal)
+        status_predare: statusPredare,
+
         articole_suplimentare: parseJsonField(contract.articole_suplimentare),
         continut_json: continutJson,
         data_creare: parseDate(contract.data_creare),

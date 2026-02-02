@@ -50,7 +50,10 @@ interface Contract {
   // NOU: Status facturare general pentru contract
   status_facturare_display?: string;
   status_facturare_filtru?: string;
-  
+
+  // NOU 02.02.2026: Status predare (bazat pe subproiecte din anexe sau proiect)
+  status_predare?: string;
+
   Observatii?: string;
   data_creare?: string;
   data_actualizare?: string;
@@ -1158,8 +1161,8 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
                     Valoare Contract
                   </th>
                   {/* NOU: Coloana pentru Status Facturare/Încasare */}
-                  <th style={{ 
-                    padding: '1rem 0.75rem', 
+                  <th style={{
+                    padding: '1rem 0.75rem',
                     textAlign: 'left',
                     fontWeight: '600',
                     color: '#2c3e50',
@@ -1169,6 +1172,24 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
                     minWidth: '280px'
                   }}>
                     Status Facturare/Încasare
+                  </th>
+                  {/* NOU 02.02.2026: Coloană pentru Predat (similar cu lista proiecte) */}
+                  <th style={{
+                    padding: '0.5rem',
+                    textAlign: 'center',
+                    fontWeight: '600',
+                    color: '#2c3e50',
+                    fontSize: '11px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                    writingMode: 'vertical-rl',
+                    textOrientation: 'mixed',
+                    transform: 'rotate(180deg)',
+                    height: '70px',
+                    width: '45px',
+                    verticalAlign: 'bottom'
+                  }}>
+                    Predat
                   </th>
                   {/* ✅ ADĂUGAT: Coloană pentru Status general anexe */}
                   <th style={{
@@ -1355,6 +1376,27 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
                         }}>
                           {formatStatusFacturare(contract.status_facturare_display)}
                         </td>
+                        {/* NOU 02.02.2026: Coloană Predat pentru contract */}
+                        <td style={{ padding: '0.5rem', textAlign: 'center' }}>
+                          <span style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: '0.35rem 0.6rem',
+                            borderRadius: '8px',
+                            fontSize: '12px',
+                            fontWeight: '600',
+                            background: contract.status_predare === 'Predat'
+                              ? 'rgba(39, 174, 96, 0.15)'
+                              : 'rgba(243, 156, 18, 0.15)',
+                            color: contract.status_predare === 'Predat'
+                              ? '#27ae60'
+                              : '#f39c12',
+                            border: `1px solid ${contract.status_predare === 'Predat' ? 'rgba(39, 174, 96, 0.3)' : 'rgba(243, 156, 18, 0.3)'}`
+                          }}>
+                            {contract.status_predare === 'Predat' ? '✓ Da' : '✗ Nu'}
+                          </span>
+                        </td>
                         {/* ✅ ADĂUGAT: Coloană pentru Status contract */}
                         <td style={{
                           padding: '0.75rem',
@@ -1481,6 +1523,15 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
                           }}>
                             {formatStatusFacturare(etapa.status_facturare_display)}
                           </td>
+                          {/* NOU 02.02.2026: Coloană Predat pentru etapă (se moștenește de la contract) */}
+                          <td style={{
+                            padding: '0.5rem 0.75rem',
+                            textAlign: 'center',
+                            color: '#7f8c8d',
+                            fontSize: '12px'
+                          }}>
+                            -
+                          </td>
                           {/* ✅ ADĂUGAT: Coloană pentru Status etapă (nu are status propriu, afișez "-") */}
                           <td style={{
                             padding: '0.5rem 0.75rem',
@@ -1596,6 +1647,15 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
                             padding: '0.5rem 0.75rem'
                           }}>
                             {formatStatusFacturare(anexa.status_facturare_display)}
+                          </td>
+                          {/* NOU 02.02.2026: Coloană Predat pentru anexă (se moștenește de la contract) */}
+                          <td style={{
+                            padding: '0.5rem 0.75rem',
+                            textAlign: 'center',
+                            color: '#7f8c8d',
+                            fontSize: '12px'
+                          }}>
+                            -
                           </td>
                           {/* ✅ ADĂUGAT: Coloană pentru Status anexă */}
                           <td style={{
