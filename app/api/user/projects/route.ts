@@ -294,10 +294,18 @@ export async function GET(request: NextRequest) {
       types.statusContract = 'STRING';
     }
 
-    // Filtrare pe responsabil
+    // Filtrare pe responsabil - FIX 02.02.2026: Include toate rolurile (Principal, Normal, Observator)
+    // Caută și în ProiecteResponsabili_v2 nu doar în câmpul principal Responsabil
     const responsabil = searchParams.get('responsabil');
     if (responsabil) {
-      conditions.push('LOWER(COALESCE(p.Responsabil, "")) LIKE LOWER(@responsabil)');
+      conditions.push(`(
+        LOWER(COALESCE(p.Responsabil, "")) LIKE LOWER(@responsabil)
+        OR p.ID_Proiect IN (
+          SELECT pr.proiect_id
+          FROM \`${PROJECT_ID}.${DATASET}.ProiecteResponsabili${tableSuffix}\` pr
+          WHERE LOWER(pr.responsabil_nume) LIKE LOWER(@responsabil)
+        )
+      )`);
       params.responsabil = `%${responsabil}%`;
       types.responsabil = 'STRING';
     }
@@ -461,8 +469,16 @@ export async function GET(request: NextRequest) {
       subConditions.push('COALESCE(s.status_contract, "Nu e cazul") = @statusContract');
     }
 
+    // FIX 02.02.2026: Include toate rolurile (Principal, Normal, Observator) pentru subproiecte
     if (responsabil) {
-      subConditions.push('LOWER(COALESCE(s.Responsabil, "")) LIKE LOWER(@responsabil)');
+      subConditions.push(`(
+        LOWER(COALESCE(s.Responsabil, "")) LIKE LOWER(@responsabil)
+        OR s.ID_Subproiect IN (
+          SELECT sr.subproiect_id
+          FROM \`${PROJECT_ID}.${DATASET}.SubproiecteResponsabili${tableSuffix}\` sr
+          WHERE LOWER(sr.responsabil_nume) LIKE LOWER(@responsabil)
+        )
+      )`);
     }
 
     if (subConditions.length > 0) {
