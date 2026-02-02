@@ -854,17 +854,21 @@ function calculeazaSumaAnexaCuValoriEstimate(anexaEtape: any[]) {
   };
 }
 
-// PĂSTRAT identic - Preparare date template
+// MODIFICAT: Preparare date template - adăugat parametru customDataContract
 function prepareSimpleTemplateData(
-  proiect: any, 
-  subproiecte: any[], 
+  proiect: any,
+  subproiecte: any[],
   contractData: any,
   termene: any[],
-  observatii?: string
+  observatii?: string,
+  customDataContract?: string | null
 ) {
   const { sumaOriginala, monedaOriginala } = calculeazaSumaContractCuValoriEstimate(proiect, subproiecte, termene);
-  
-  const dataContract = new Date().toLocaleDateString('ro-RO');
+
+  // NOU: Folosește data custom dacă e furnizată, altfel data de azi
+  const dataContract = customDataContract
+    ? new Date(customDataContract).toLocaleDateString('ro-RO')
+    : new Date().toLocaleDateString('ro-RO');
   const durataZile = calculateDurationInDays(proiect.Data_Start, proiect.Data_Final);
   
   const templateData = {
@@ -921,21 +925,25 @@ function prepareSimpleTemplateData(
   return templateData;
 }
 
-// NOUĂ FUNCȚIE: Preparare date template pentru anexă
+// MODIFICATĂ FUNCȚIE: Preparare date template pentru anexă - adăugat parametru customDataContract
 function prepareAnexaTemplateData(
-  proiect: any, 
-  subproiecte: any[], 
+  proiect: any,
+  subproiecte: any[],
   contractData: any,
   anexaEtape: any[],
   anexaNumar: number,
   anexaDataStart: string,
   anexaDataFinal: string,
   anexaObservatii?: string,
-  anexaDescrierelucrari?: string
+  anexaDescrierelucrari?: string,
+  customDataContract?: string | null
 ) {
   const { sumaOriginala, monedaOriginala } = calculeazaSumaAnexaCuValoriEstimate(anexaEtape);
-  
-  const dataContract = new Date().toLocaleDateString('ro-RO');
+
+  // NOU: Folosește data custom dacă e furnizată, altfel data de azi
+  const dataContract = customDataContract
+    ? new Date(customDataContract).toLocaleDateString('ro-RO')
+    : new Date().toLocaleDateString('ro-RO');
   const durataZile = calculateDurationInDays(anexaDataStart, anexaDataFinal);
   
   const templateData = {
@@ -1202,7 +1210,8 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
 	      continut_json = PARSE_JSON(@continutJson),
 	      Observatii = @observatii,
 	      versiune = versiune + 1,
-	      Status = 'Activ'
+	      Status = 'Activ',
+	      data_contract = @dataContractCustom
 	    WHERE ID_Contract = @contractId
 	  `;
 
@@ -1224,7 +1233,8 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
 	      },
 	      placeholderData: contractInfo.placeholderData
 	    }),
-	    observatii: sanitizeStringForBigQuery(contractInfo.observatii)
+	    observatii: sanitizeStringForBigQuery(contractInfo.observatii),
+	    dataContractCustom: contractInfo.dataContract || null // NOU: Data contract custom
 	  };
 
 	  console.log(`[CONTRACT-UPDATE] Actualizare contract ${contractInfo.contractExistentId} cu Status = 'Activ' (reactivare după ștergere)`);
@@ -1244,7 +1254,8 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
 	      valoareRon: 'STRING',
 	      articoleSuplimentare: 'STRING',
 	      continutJson: 'STRING',
-	      observatii: 'STRING'
+	      observatii: 'STRING',
+	      dataContractCustom: 'DATE' // NOU: Tip pentru data contract
 	    },
 	    location: 'EU',
 	  });
@@ -1254,18 +1265,18 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
     } else {
       const insertQuery = `
         INSERT INTO ${TABLE_CONTRACTE}
-        (ID_Contract, numar_contract, serie_contract, tip_document, proiect_id, 
+        (ID_Contract, numar_contract, serie_contract, tip_document, proiect_id,
          client_id, client_nume, Denumire_Contract, Data_Semnare, Data_Expirare,
          Status, Valoare, Moneda, curs_valutar, data_curs_valutar, valoare_ron,
-         articole_suplimentare, data_creare, data_actualizare, 
-         continut_json, Observatii, versiune)
-        VALUES 
+         articole_suplimentare, data_creare, data_actualizare,
+         continut_json, Observatii, versiune, data_contract)
+        VALUES
         (@contractId, @numarContract, @serieContract, @tipDocument, @proiectId,
          @clientId, @clientNume, @denumireContract, @dataSemnare, @dataExpirare,
          @status, CAST(@valoare AS NUMERIC), @moneda, @cursValutar, @dataCurs, CAST(@valoareRon AS NUMERIC),
-         PARSE_JSON(@articoleSuplimentare), 
-         CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(), 
-         PARSE_JSON(@continutJson), @observatii, @versiune)
+         PARSE_JSON(@articoleSuplimentare),
+         CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(),
+         PARSE_JSON(@continutJson), @observatii, @versiune, @dataContractCustom)
       `;
 
       const parametriiInsert = {
@@ -1294,7 +1305,8 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
           placeholderData: contractInfo.placeholderData
         }),
         observatii: sanitizeStringForBigQuery(contractInfo.observatii),
-        versiune: 1
+        versiune: 1,
+        dataContractCustom: contractInfo.dataContract || null // NOU: Data contract custom
       };
 
       await bigquery.query({
@@ -1320,7 +1332,8 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
 	    articoleSuplimentare: 'STRING',
 	    continutJson: 'STRING',
 	    observatii: 'STRING',
-	    versiune: 'INT64'
+	    versiune: 'INT64',
+	    dataContractCustom: 'DATE' // NOU: Tip pentru data contract
 	  },
 	  location: 'EU',
 	});
@@ -1635,7 +1648,7 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
   }
 }
 
-// NOUĂ FUNCȚIE: Generare template și fișier anexă
+// MODIFICATĂ FUNCȚIE: Generare template și fișier anexă - adăugat parametru customDataContract
 async function generateAnexaDocument(
   proiectComplet: any,
   subproiecte: any[],
@@ -1645,9 +1658,10 @@ async function generateAnexaDocument(
   anexaDataFinal: string,
   anexaEtape: any[],
   anexaObservatii: string,
-  anexaDescrierelucrari: string
+  anexaDescrierelucrari: string,
+  customDataContract?: string | null
 ): Promise<Buffer> {
-  
+
   // Pregătește datele pentru anexă folosind aceleași surse ca contractul
 	const anexaTemplateData = prepareAnexaTemplateData(
 	  proiectComplet,
@@ -1658,7 +1672,8 @@ async function generateAnexaDocument(
 	  anexaDataStart,
 	  anexaDataFinal,
 	  anexaObservatii,
-	  anexaDescrierelucrari
+	  anexaDescrierelucrari,
+	  customDataContract // NOU: Pasează data contract custom
 	);
   
   let anexaBuffer: Buffer;
@@ -1743,10 +1758,13 @@ export async function POST(request: NextRequest) {
 	  contractExistentId = null,
 	  contractPreview,
 	  contractPrefix,
-	  
+
 	  // NOUĂ LOGICĂ: Parametru pentru numărul custom
 	  customContractNumber = null,
-	  
+
+	  // NOU: Data contract (poate fi diferită de data curentă, pentru contracte retroactive)
+	  dataContract = null,
+
 	  // Parametri pentru anexă
 	  anexaActiva = false,
 	  anexaEtape = [],
@@ -1767,7 +1785,8 @@ export async function POST(request: NextRequest) {
       anexaActiva,
       anexa_etape_count: anexaEtape.length,
       anexaNumar,
-      customContractNumber: customContractNumber || 'auto-generated'
+      customContractNumber: customContractNumber || 'auto-generated',
+      dataContract: dataContract || 'auto (today)'
     });
 
     // 1. ÎNCĂRCAREA DATELOR PROIECT
@@ -1846,11 +1865,12 @@ export async function POST(request: NextRequest) {
 
     // 4. PREGĂTIREA DATELOR TEMPLATE PENTRU CONTRACT
     const placeholderData = prepareSimpleTemplateData(
-      proiect, 
-      subproiecte, 
+      proiect,
+      subproiecte,
       contractData,
       termenePersonalizate,
-      observatii
+      observatii,
+      dataContract // NOU: Pasează data contract custom
     );
 
     console.log('[CONTRACT-GENERATE] Template data contract pregătit pentru:', contractData.numar_contract);
@@ -1930,7 +1950,8 @@ export async function POST(request: NextRequest) {
 	  anexaDataFinal,
 	  anexaEtape,
 	  anexaObservatii,
-	  anexaDescrierelucrari
+	  anexaDescrierelucrari,
+	  dataContract // NOU: Pasează data contract custom
 	);
         anexaGenerated = true;
         
@@ -1961,7 +1982,10 @@ export async function POST(request: NextRequest) {
 	  // Adaugă acestea:
 	  sumaOriginalaNumeric: calculContractResult.sumaOriginalaNumeric,
 	  monedaOriginalaForDB: calculContractResult.monedaOriginalaForDB,
-      
+
+      // NOU: Data contract custom (pentru contracte cu date din trecut)
+      dataContract: dataContract || null,
+
       // Date anexă pentru salvare
       anexaActiva: anexaGenerated,
       anexaEtape: anexaGenerated ? anexaEtape : [],

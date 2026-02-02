@@ -718,6 +718,8 @@ export async function GET(request: NextRequest) {
         // REPARAT: Păstrează datele raw din BigQuery pentru frontend
         Data_Semnare: contract.Data_Semnare?.value || contract.Data_Semnare,
         Data_Expirare: contract.Data_Expirare?.value || contract.Data_Expirare,
+        // NOU: Data contract (poate fi diferită de data creare, pentru contracte retroactive)
+        data_contract: contract.data_contract?.value || contract.data_contract,
         
         Status: contract.Status,
         Valoare: valoareConvertita,

@@ -28,6 +28,7 @@ interface ContractExistent {
   numar_contract: string;
   Status: string;
   data_creare: string;
+  data_contract?: string | { value: string }; // NOU: Data contract (pentru contracte retroactive)
   Valoare: number;
   Moneda: string;
   etape?: any[];
@@ -237,7 +238,13 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
   });
   const [validationLoading, setValidationLoading] = useState(false);
   const [originalGeneratedNumber, setOriginalGeneratedNumber] = useState('');
-  
+
+  // NOU: State pentru data contract (poate fi diferită de data curentă)
+  const [dataContract, setDataContract] = useState(() => {
+    // Default: data de azi în format YYYY-MM-DD
+    return new Date().toISOString().split('T')[0];
+  });
+
   // PĂSTRAT: Termene contract
   const [termenePersonalizate, setTermenePersonalizate] = useState<TermenPersonalizat[]>([]);
 
@@ -912,7 +919,25 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
         
         setContractPreview(contract.numar_contract);
         setContractPreviewForGeneration(contract.numar_contract);
-        
+
+        // NOU: Încarcă data contract existentă (sau data creare ca fallback)
+        if (contract.data_contract) {
+          const existingDate = typeof contract.data_contract === 'object' && contract.data_contract?.value
+            ? contract.data_contract.value
+            : contract.data_contract;
+          if (existingDate && typeof existingDate === 'string') {
+            setDataContract(existingDate.split('T')[0]);
+          }
+        } else if (contract.data_creare) {
+          // Fallback la data creare dacă nu există data_contract
+          const creareDate = typeof contract.data_creare === 'object' && contract.data_creare?.value
+            ? contract.data_creare.value
+            : contract.data_creare;
+          if (creareDate && typeof creareDate === 'string') {
+            setDataContract(creareDate.split('T')[0]);
+          }
+        }
+
         // NOUĂ LOGICĂ: Pentru contract existent, salvează numărul original
         setOriginalGeneratedNumber(contract.numar_contract);
         setIsManuallyEdited(false);
@@ -1778,7 +1803,7 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
             </div>
           )}
 
-          {/* MODIFICAT: Numărul contractului - editabil pentru contract nou și existent */}
+          {/* MODIFICAT: Numărul contractului și Data - editabil pentru contract nou și existent */}
           <div style={{
             background: isEditMode ? '#fff3cd' : '#e8f5e8',
             border: `1px solid ${isEditMode ? '#ffc107' : '#c3e6cb'}`,
@@ -1787,66 +1812,97 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
             marginBottom: '1.5rem'
           }}>
             <h3 style={{ margin: '0 0 1rem 0', color: '#2c3e50', fontSize: '16px' }}>
-              {isEditMode ? 'Număr Contract Existent (Editabil)' : 'Număr Contract Consecutiv (Editabil)'}
+              {isEditMode ? 'Număr și Dată Contract Existent (Editabil)' : 'Număr și Dată Contract (Editabil)'}
             </h3>
-            
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
-              <div style={{ flex: 1 }}>
+
+            {/* Container pentru număr și dată pe același rând */}
+            <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
+              {/* Număr Contract */}
+              <div style={{ flex: '2', minWidth: '200px' }}>
+                <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '0.25rem', fontWeight: '600' }}>
+                  Număr contract
+                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <input
+                    type="text"
+                    value={localContractNumber}
+                    onChange={(e) => setLocalContractNumber(e.target.value)}
+                    disabled={loading || loadingDelete || validationLoading}
+                    placeholder="CONTR-1001-2025"
+                    style={{
+                      flex: 1,
+                      padding: '0.75rem 1rem',
+                      border: `2px solid ${contractNumberValidation.isValid ? '#27ae60' : '#e74c3c'}`,
+                      borderRadius: '8px',
+                      fontSize: '18px',
+                      fontFamily: 'monospace',
+                      fontWeight: 'bold',
+                      color: contractNumberValidation.isValid ? '#27ae60' : '#e74c3c',
+                      background: isManuallyEdited ? '#fff8e1' : '#fff',
+                      transition: 'all 0.3s ease'
+                    }}
+                  />
+                  {isManuallyEdited && (
+                    <button
+                      onClick={resetToAutoNumber}
+                      disabled={loading || loadingDelete || validationLoading}
+                      style={{
+                        padding: '0.75rem 1rem',
+                        background: '#3498db',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: (loading || loadingDelete || validationLoading) ? 'not-allowed' : 'pointer',
+                        fontSize: '12px',
+                        fontWeight: 'bold'
+                      }}
+                    >
+                      Reset Auto
+                    </button>
+                  )}
+                  {validationLoading && (
+                    <div style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '50%',
+                      border: '3px solid #3498db',
+                      borderTop: '3px solid transparent',
+                      animation: 'spin 1s linear infinite'
+                    }}>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Data Contract - NOU */}
+              <div style={{ flex: '1', minWidth: '160px' }}>
+                <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '0.25rem', fontWeight: '600' }}>
+                  Data contract
+                </label>
                 <input
-                  type="text"
-                  value={localContractNumber}
-                  onChange={(e) => setLocalContractNumber(e.target.value)}
-                  disabled={loading || loadingDelete || validationLoading}
-                  placeholder="CONTR-1001-2025"
+                  type="date"
+                  value={dataContract}
+                  onChange={(e) => setDataContract(e.target.value)}
+                  disabled={loading || loadingDelete}
                   style={{
                     width: '100%',
                     padding: '0.75rem 1rem',
-                    border: `2px solid ${contractNumberValidation.isValid ? '#27ae60' : '#e74c3c'}`,
+                    border: '2px solid #27ae60',
                     borderRadius: '8px',
-                    fontSize: '18px',
-                    fontFamily: 'monospace',
+                    fontSize: '16px',
                     fontWeight: 'bold',
-                    color: contractNumberValidation.isValid ? '#27ae60' : '#e74c3c',
-                    background: isManuallyEdited ? '#fff8e1' : '#fff',
-                    transition: 'all 0.3s ease'
+                    color: '#27ae60',
+                    background: '#fff',
+                    transition: 'all 0.3s ease',
+                    cursor: 'pointer'
                   }}
                 />
-              </div>
-              
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                {isManuallyEdited && (
-                  <button
-                    onClick={resetToAutoNumber}
-                    disabled={loading || loadingDelete || validationLoading}
-                    style={{
-                      padding: '0.75rem 1rem',
-                      background: '#3498db',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '6px',
-                      cursor: (loading || loadingDelete || validationLoading) ? 'not-allowed' : 'pointer',
-                      fontSize: '12px',
-                      fontWeight: 'bold'
-                    }}
-                  >
-                    Reset Auto
-                  </button>
-                )}
-                
-                {validationLoading && (
-                  <div style={{
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: '50%',
-                    border: '3px solid #3498db',
-                    borderTop: '3px solid transparent',
-                    animation: 'spin 1s linear infinite'
-                  }}>
-                  </div>
-                )}
+                <div style={{ fontSize: '11px', color: '#7f8c8d', marginTop: '0.25rem' }}>
+                  Data afișată pe contract
+                </div>
               </div>
             </div>
-            
+
             {/* Indicator stare și validare */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ fontSize: '12px' }}>
@@ -1859,19 +1915,19 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                     🔄 Generat automat
                   </span>
                 )}
-                
+
                 {contractNumberValidation.isDuplicate && (
                   <span style={{ color: '#e74c3c', marginLeft: '10px' }}>
                     ⚠️ Dublcat detectat
                   </span>
                 )}
               </div>
-              
+
               <div style={{ fontSize: '11px', color: '#7f8c8d' }}>
                 Orice format acceptat
               </div>
             </div>
-            
+
             {/* Mesaj de validare */}
             {contractNumberValidation.error && (
               <div style={{
@@ -2992,10 +3048,13 @@ export default function ContractModal({ proiect, isOpen, onClose, onSuccess }: C
                         contractExistentId: contractExistent?.ID_Contract || null,
                         contractPreview: contractPreviewForGeneration,
                         contractPrefix: contractPrefix,
-                        
+
                         // NOUĂ LOGICĂ: Trimite numărul custom dacă e modificat manual
                         customContractNumber: isManuallyEdited ? contractPreview : null,
-                        
+
+                        // NOU: Data contract (poate fi diferită de data curentă)
+                        dataContract: dataContract,
+
                         // Date pentru anexă
                         anexaActiva,
                         anexaEtape: anexaActiva ? anexaEtape : [],
