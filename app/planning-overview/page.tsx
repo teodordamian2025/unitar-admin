@@ -8,6 +8,7 @@
 // ACTUALIZAT: Adăugat buton "+" în celule goale, modal adăugare alocări cu search proiecte,
 //             butoane delete/edit/add în modal detalii, text wrapping pe 2 linii
 // ACTUALIZAT 22.01.2026: Adăugat bare de progres General și Economic + buton detalii proiect
+// ACTUALIZAT 03.02.2026: Adăugat funcționalitate Înregistrare Timp pentru alocări
 // ==================================================================
 
 import { useState, useEffect, useCallback } from 'react';
@@ -136,6 +137,14 @@ export default function PlanningOverviewPage() {
   const [editOre, setEditOre] = useState<number>(8);
   const [editPrioritate, setEditPrioritate] = useState<string>('normala');
   const [editObservatii, setEditObservatii] = useState<string>('');
+
+  // State pentru înregistrare timp din alocări
+  const [selectedAlocariForTime, setSelectedAlocariForTime] = useState<Set<string>>(new Set());
+  const [registeredAlocariIds, setRegisteredAlocariIds] = useState<Set<string>>(new Set());
+  const [timeRegistrationLoading, setTimeRegistrationLoading] = useState(false);
+  const [orePerAlocare, setOrePerAlocare] = useState<Record<string, number>>({});
+  const [observatiiPerAlocare, setObservatiiPerAlocare] = useState<Record<string, string>>({});
+  const [existingTimeEntries, setExistingTimeEntries] = useState<Record<string, boolean>>({});
 
   // Verificare rol utilizator
   useEffect(() => {
@@ -548,6 +557,204 @@ export default function PlanningOverviewPage() {
     setEditPrioritate(alocare.prioritate);
     setEditObservatii(alocare.observatii || '');
   };
+
+  // Funcție pentru toggle selecție alocare pentru înregistrare timp
+  const toggleAlocareForTime = (alocareId: string, alocare: Planificare) => {
+    setSelectedAlocariForTime(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(alocareId)) {
+        newSet.delete(alocareId);
+        // Șterge și datele asociate
+        setOrePerAlocare(prevOre => {
+          const newOre = { ...prevOre };
+          delete newOre[alocareId];
+          return newOre;
+        });
+        setObservatiiPerAlocare(prevObs => {
+          const newObs = { ...prevObs };
+          delete newObs[alocareId];
+          return newObs;
+        });
+      } else {
+        newSet.add(alocareId);
+        // Inițializează cu orele planificate
+        setOrePerAlocare(prevOre => ({
+          ...prevOre,
+          [alocareId]: alocare.ore_planificate
+        }));
+      }
+      return newSet;
+    });
+  };
+
+  // Funcție pentru verificarea existenței înregistrărilor de timp pentru alocări
+  const checkExistingTimeEntries = useCallback(async (planificari: Planificare[], userId: string, date: string) => {
+    if (!planificari.length) return;
+
+    try {
+      const existingMap: Record<string, boolean> = {};
+
+      for (const p of planificari) {
+        // Construiește identificatorul unic pentru verificare
+        const proiectId = p.proiect_id || p.sarcina_proiect_id || p.parent_proiect_id;
+        if (!proiectId && !p.subproiect_id && !p.sarcina_id) continue;
+
+        // Verifică dacă există înregistrare pentru această combinație
+        const params = new URLSearchParams({
+          utilizator_uid: userId,
+          data_lucru: date
+        });
+
+        if (proiectId) {
+          params.append('proiect_id', proiectId);
+        }
+
+        const response = await fetch(`/api/rapoarte/timetracking?${params}&limit=100`);
+        const result = await response.json();
+
+        if (result.success && result.data && result.data.length > 0) {
+          // Marchează această alocare ca având înregistrare existentă
+          existingMap[p.id] = true;
+        }
+      }
+
+      setExistingTimeEntries(existingMap);
+    } catch (error) {
+      console.error('Eroare la verificarea înregistrărilor existente:', error);
+    }
+  }, []);
+
+  // Verifică înregistrări existente când se deschide modalul de detalii
+  useEffect(() => {
+    if (selectedCell && selectedCell.planificari.length > 0) {
+      checkExistingTimeEntries(selectedCell.planificari, selectedCell.uid, selectedCell.data);
+      // Reset selecțiile când se schimbă celula
+      setSelectedAlocariForTime(new Set());
+      setOrePerAlocare({});
+      setObservatiiPerAlocare({});
+    }
+  }, [selectedCell, checkExistingTimeEntries]);
+
+  // Funcție pentru înregistrarea timpului pentru alocările selectate
+  const registerTimeForAllocations = async () => {
+    if (!selectedCell || selectedAlocariForTime.size === 0) {
+      toast.error('Selectați cel puțin o alocare pentru înregistrare');
+      return;
+    }
+
+    setTimeRegistrationLoading(true);
+
+    try {
+      const errors: string[] = [];
+      const successfulIds: string[] = [];
+
+      for (const alocareId of Array.from(selectedAlocariForTime)) {
+        const alocare = selectedCell.planificari.find(p => p.id === alocareId);
+        if (!alocare) continue;
+
+        // Verifică ore
+        const ore = orePerAlocare[alocareId] || alocare.ore_planificate;
+        if (!ore || ore <= 0) {
+          errors.push(`Orele pentru "${alocare.proiect_denumire || alocare.sarcina_titlu || alocareId}" sunt invalide`);
+          continue;
+        }
+
+        // Verifică observații (obligatorii dacă există deja înregistrare)
+        const observatii = observatiiPerAlocare[alocareId] || '';
+        if (existingTimeEntries[alocareId] && !observatii.trim()) {
+          errors.push(`Observațiile sunt obligatorii pentru "${alocare.proiect_denumire || alocare.sarcina_titlu}" (există deja înregistrare pentru acest proiect)`);
+          continue;
+        }
+
+        // Determină proiect_id și subproiect_id
+        let proiect_id = alocare.proiect_id || null;
+        let subproiect_id = alocare.subproiect_id || null;
+        let sarcina_id = alocare.sarcina_id || null;
+
+        // Pentru sarcini, folosim proiectul părinte
+        if (sarcina_id && alocare.sarcina_proiect_id) {
+          proiect_id = alocare.sarcina_proiect_id;
+        }
+
+        // Construiește descrierea
+        let descriere = observatii.trim();
+        if (!descriere) {
+          descriere = `Lucrat conform planificării: ${alocare.proiect_denumire || ''}${alocare.subproiect_denumire ? ' / ' + alocare.subproiect_denumire : ''}${alocare.sarcina_titlu ? ' / ' + alocare.sarcina_titlu : ''}`.trim();
+        }
+
+        const timeData = {
+          id: `TIME_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+          sarcina_id: sarcina_id,
+          utilizator_uid: selectedCell.uid, // UID-ul utilizatorului din alocare
+          utilizator_nume: selectedCell.nume, // Numele utilizatorului din alocare
+          data_lucru: selectedCell.data,
+          ore_lucrate: ore,
+          descriere_lucru: descriere,
+          tip_inregistrare: 'manual',
+          proiect_id: proiect_id,
+          subproiect_id: subproiect_id
+        };
+
+        try {
+          const response = await fetch('/api/rapoarte/timetracking', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(timeData)
+          });
+
+          const result = await response.json();
+
+          if (result.success) {
+            successfulIds.push(alocareId);
+          } else {
+            errors.push(`Eroare pentru "${alocare.proiect_denumire || alocare.sarcina_titlu}": ${result.error}`);
+          }
+        } catch (err) {
+          errors.push(`Eroare la înregistrare pentru "${alocare.proiect_denumire || alocare.sarcina_titlu}"`);
+        }
+      }
+
+      // Actualizează starea cu înregistrările reușite
+      if (successfulIds.length > 0) {
+        setRegisteredAlocariIds(prev => {
+          const newSet = new Set(prev);
+          successfulIds.forEach(id => newSet.add(id));
+          return newSet;
+        });
+
+        // Șterge din selecție
+        setSelectedAlocariForTime(prev => {
+          const newSet = new Set(prev);
+          successfulIds.forEach(id => newSet.delete(id));
+          return newSet;
+        });
+
+        // Marchează ca având înregistrări existente
+        setExistingTimeEntries(prev => {
+          const newMap = { ...prev };
+          successfulIds.forEach(id => {
+            newMap[id] = true;
+          });
+          return newMap;
+        });
+
+        toast.success(`${successfulIds.length} înregistrare/i de timp salvate cu succes!`);
+      }
+
+      if (errors.length > 0) {
+        errors.forEach(err => toast.error(err));
+      }
+
+    } catch (error) {
+      console.error('Eroare la înregistrarea timpului:', error);
+      toast.error('Eroare la înregistrarea timpului');
+    } finally {
+      setTimeRegistrationLoading(false);
+    }
+  };
+
+  // Verifică dacă butonul de înregistrare timp trebuie să fie activ
+  const canRegisterTime = selectedAlocariForTime.size > 0 && !timeRegistrationLoading;
 
   // Funcții pentru navigare săptămână
   const goToPreviousWeek = () => {
@@ -1270,28 +1477,76 @@ export default function PlanningOverviewPage() {
                   </div>
                 </div>
 
-                {/* Buton adăugare alocare nouă */}
-                <button
-                  onClick={() => openAddModal(selectedCell.uid, selectedCell.nume, selectedCell.data)}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '8px',
-                    fontSize: '0.875rem',
-                    fontWeight: '600',
-                    cursor: 'pointer',
+                {/* Butoane acțiuni */}
+                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+                  {/* Buton adăugare alocare nouă */}
+                  <button
+                    onClick={() => openAddModal(selectedCell.uid, selectedCell.nume, selectedCell.data)}
+                    style={{
+                      flex: 1,
+                      padding: '0.75rem',
+                      background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.5rem'
+                    }}
+                  >
+                    ➕ Adaugă alocare
+                  </button>
+
+                  {/* Buton înregistrare timp */}
+                  <button
+                    onClick={registerTimeForAllocations}
+                    disabled={!canRegisterTime}
+                    style={{
+                      flex: 1,
+                      padding: '0.75rem',
+                      background: canRegisterTime
+                        ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
+                        : '#d1d5db',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      cursor: canRegisterTime ? 'pointer' : 'not-allowed',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.5rem',
+                      opacity: canRegisterTime ? 1 : 0.7
+                    }}
+                    title={selectedAlocariForTime.size === 0 ? 'Bifați cel puțin o alocare' : 'Înregistrează timp'}
+                  >
+                    {timeRegistrationLoading ? '⏳ Se înregistrează...' : `⏱️ Înregistrare timp${selectedAlocariForTime.size > 0 ? ` (${selectedAlocariForTime.size})` : ''}`}
+                  </button>
+                </div>
+
+                {/* Mesaj ajutor pentru înregistrare timp */}
+                {selectedCell.planificari.length > 0 && (
+                  <div style={{
+                    background: '#fef3c7',
+                    border: '1px solid #fcd34d',
+                    borderRadius: '6px',
+                    padding: '0.5rem 0.75rem',
+                    marginBottom: '1rem',
+                    fontSize: '0.75rem',
+                    color: '#92400e',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '0.5rem',
-                    marginBottom: '1rem'
-                  }}
-                >
-                  ➕ Adaugă alocare nouă
-                </button>
+                    gap: '0.5rem'
+                  }}>
+                    <span>💡</span>
+                    <span>Bifați alocările pentru a înregistra timpul lucrat pentru <strong>{selectedCell.nume}</strong></span>
+                  </div>
+                )}
 
                 {selectedCell.planificari.length > 0 ? (
                   <div>
@@ -1415,6 +1670,39 @@ export default function PlanningOverviewPage() {
                           ) : (
                             // Afișare normală
                             <>
+                              {/* Checkbox pentru înregistrare timp */}
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem',
+                                marginBottom: '0.5rem',
+                                paddingBottom: '0.5rem',
+                                borderBottom: '1px dashed #e5e7eb'
+                              }}>
+                                <input
+                                  type="checkbox"
+                                  checked={selectedAlocariForTime.has(p.id)}
+                                  onChange={() => toggleAlocareForTime(p.id, p)}
+                                  disabled={registeredAlocariIds.has(p.id)}
+                                  style={{
+                                    width: '18px',
+                                    height: '18px',
+                                    accentColor: '#f59e0b',
+                                    cursor: registeredAlocariIds.has(p.id) ? 'not-allowed' : 'pointer'
+                                  }}
+                                />
+                                <span style={{
+                                  fontSize: '0.7rem',
+                                  color: registeredAlocariIds.has(p.id) ? '#10b981' : existingTimeEntries[p.id] ? '#f59e0b' : '#6b7280'
+                                }}>
+                                  {registeredAlocariIds.has(p.id)
+                                    ? '✅ Timp înregistrat'
+                                    : existingTimeEntries[p.id]
+                                    ? '⚠️ Există înregistrări anterioare'
+                                    : 'Bifează pentru înregistrare timp'}
+                                </span>
+                              </div>
+
                               <div style={{
                                 display: 'flex',
                                 justifyContent: 'space-between',
@@ -1681,6 +1969,72 @@ export default function PlanningOverviewPage() {
                                   </button>
                                 );
                               })()}
+
+                              {/* Formular înregistrare timp - afișat când alocarea e bifată */}
+                              {selectedAlocariForTime.has(p.id) && !registeredAlocariIds.has(p.id) && (
+                                <div style={{
+                                  marginTop: '0.75rem',
+                                  padding: '0.75rem',
+                                  background: '#fffbeb',
+                                  border: '1px solid #fcd34d',
+                                  borderRadius: '6px'
+                                }}>
+                                  <div style={{ fontSize: '0.7rem', fontWeight: '600', color: '#92400e', marginBottom: '0.5rem' }}>
+                                    ⏱️ Configurare înregistrare timp
+                                  </div>
+                                  <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                                    <div style={{ flex: 1 }}>
+                                      <label style={{ fontSize: '0.65rem', color: '#6b7280', display: 'block', marginBottom: '2px' }}>
+                                        Ore lucrate
+                                      </label>
+                                      <input
+                                        type="number"
+                                        value={orePerAlocare[p.id] || p.ore_planificate}
+                                        onChange={(e) => setOrePerAlocare(prev => ({
+                                          ...prev,
+                                          [p.id]: parseFloat(e.target.value) || 0
+                                        }))}
+                                        min={0.1}
+                                        max={16}
+                                        step={0.1}
+                                        style={{
+                                          width: '100%',
+                                          padding: '0.35rem',
+                                          border: '1px solid #d1d5db',
+                                          borderRadius: '4px',
+                                          fontSize: '0.8rem'
+                                        }}
+                                      />
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <label style={{ fontSize: '0.65rem', color: '#6b7280', display: 'block', marginBottom: '2px' }}>
+                                      Observații {existingTimeEntries[p.id] ? <span style={{ color: '#dc2626' }}>*</span> : '(opțional)'}
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={observatiiPerAlocare[p.id] || ''}
+                                      onChange={(e) => setObservatiiPerAlocare(prev => ({
+                                        ...prev,
+                                        [p.id]: e.target.value
+                                      }))}
+                                      placeholder={existingTimeEntries[p.id] ? 'Obligatoriu - diferențiază de înregistrările anterioare' : 'Descriere activitate...'}
+                                      style={{
+                                        width: '100%',
+                                        padding: '0.35rem',
+                                        border: `1px solid ${existingTimeEntries[p.id] && !observatiiPerAlocare[p.id] ? '#fca5a5' : '#d1d5db'}`,
+                                        borderRadius: '4px',
+                                        fontSize: '0.8rem'
+                                      }}
+                                    />
+                                    {existingTimeEntries[p.id] && (
+                                      <div style={{ fontSize: '0.6rem', color: '#dc2626', marginTop: '2px' }}>
+                                        ⚠️ Există înregistrări anterioare - observațiile sunt obligatorii
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
 
                               <div style={{ marginTop: '0.5rem' }}>
                                 <span style={{
