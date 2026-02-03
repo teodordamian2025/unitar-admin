@@ -724,7 +724,7 @@ export default function EnhancedTimeTrackingDashboard() {
                       whiteSpace: 'nowrap',
                       paddingRight: '0.5rem'
                     }}>
-                      📋 {project.proiect_nume || 'Proiect necunoscut'}
+                      📋 {project.proiect_id} - {project.proiect_nume || 'Proiect necunoscut'}
                     </h3>
                     <div style={{
                       background: (project.proiect_status || 'Necunoscut') === 'Activ'
