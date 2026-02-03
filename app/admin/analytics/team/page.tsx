@@ -217,7 +217,7 @@ export default function TeamPerformance() {
             utilizator_uid: user.uid,
             utilizator_nume: user.nume_complet,
             rol: user.rol,
-            total_ore: totalOre,
+            total_ore: Number(totalOre.toFixed(2)),
             media_ore_zilnic: Number(mediaOreZilnic.toFixed(1)),
             zile_active: zileActive,
             proiecte_lucrate: proiecteUnice,
