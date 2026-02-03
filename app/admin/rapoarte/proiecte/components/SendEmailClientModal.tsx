@@ -1,7 +1,8 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/proiecte/components/SendEmailClientModal.tsx
-// DATA: 29.01.2026
+// DATA: 03.02.2026
 // DESCRIERE: Modal complet pentru trimiterea email-urilor către clienți
+// ACTUALIZAT: Adăugat suport pentru atașare automată documente proiect
 // ==================================================================
 
 'use client';
@@ -59,6 +60,19 @@ interface Attachment {
   size: number;
   type: string;
   content: string; // base64
+}
+
+// Interfețe pentru documente proiect
+interface DocumentProiect {
+  id: string;
+  type: 'factura' | 'contract' | 'pv';
+  numar: string;
+  data: string;
+  client: string;
+  valoare?: number;
+  status?: string;
+  label: string;
+  filename: string;
 }
 
 interface SendEmailClientModalProps {
@@ -159,17 +173,28 @@ export default function SendEmailClientModal({
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // State pentru documente proiect
+  const [documenteProiect, setDocumenteProiect] = useState<{
+    facturi: DocumentProiect[];
+    contracte: DocumentProiect[];
+    pvuri: DocumentProiect[];
+  }>({ facturi: [], contracte: [], pvuri: [] });
+  const [loadingDocumente, setLoadingDocumente] = useState(false);
+  const [selectedDocuments, setSelectedDocuments] = useState<Set<string>>(new Set());
+  const [showDocuments, setShowDocuments] = useState(false);
+
   // Constante pentru limita de atașamente
   const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024; // 10MB per fișier
   const MAX_TOTAL_SIZE = 25 * 1024 * 1024; // 25MB total
 
-  // Încarcă contactele când se deschide modalul
+  // Încarcă contactele și documentele când se deschide modalul
   useEffect(() => {
     if (isOpen && proiect?.client_id) {
       loadContacte();
       loadEmailHistory();
+      loadDocumenteProiect();
     }
-  }, [isOpen, proiect?.client_id]);
+  }, [isOpen, proiect?.client_id, proiect?.id]);
 
   // Aplică template-ul selectat
   useEffect(() => {
@@ -222,6 +247,36 @@ export default function SendEmailClientModal({
       console.error('Eroare la încărcarea istoricului:', error);
     } finally {
       setLoadingHistory(false);
+    }
+  };
+
+  // Încarcă documentele proiectului
+  const loadDocumenteProiect = async () => {
+    if (!proiect?.id) return;
+
+    setLoadingDocumente(true);
+    try {
+      const response = await fetch(`/api/documents/list-for-project?proiect_id=${encodeURIComponent(proiect.id)}`);
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        setDocumenteProiect({
+          facturi: result.data.facturi || [],
+          contracte: result.data.contracte || [],
+          pvuri: result.data.pvuri || []
+        });
+        // Deschide automat secțiunea dacă există documente
+        const total = (result.data.facturi?.length || 0) +
+                      (result.data.contracte?.length || 0) +
+                      (result.data.pvuri?.length || 0);
+        if (total > 0) {
+          setShowDocuments(true);
+        }
+      }
+    } catch (error) {
+      console.error('Eroare la încărcarea documentelor:', error);
+    } finally {
+      setLoadingDocumente(false);
     }
   };
 
@@ -288,6 +343,19 @@ export default function SendEmailClientModal({
       } else {
         return [...prev, email];
       }
+    });
+  };
+
+  // Toggle selectare document
+  const toggleDocument = (docKey: string) => {
+    setSelectedDocuments(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(docKey)) {
+        newSet.delete(docKey);
+      } else {
+        newSet.add(docKey);
+      }
+      return newSet;
     });
   };
 
@@ -402,7 +470,53 @@ export default function SendEmailClientModal({
     }
 
     setLoading(true);
+
     try {
+      // 1. Generează documentele selectate (dacă există)
+      let generatedAttachments: Array<{ filename: string; content: string; contentType: string }> = [];
+
+      if (selectedDocuments.size > 0) {
+        toast.info('Se generează documentele atașate...', { autoClose: 2000 });
+
+        // Construiește lista de documente de generat
+        const documentsToGenerate: Array<{ type: 'factura' | 'contract' | 'pv'; id: string }> = [];
+
+        selectedDocuments.forEach(key => {
+          const [type, id] = key.split(':');
+          if (type && id) {
+            documentsToGenerate.push({ type: type as 'factura' | 'contract' | 'pv', id });
+          }
+        });
+
+        if (documentsToGenerate.length > 0) {
+          const genResponse = await fetch('/api/documents/generate-for-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ documents: documentsToGenerate })
+          });
+
+          const genResult = await genResponse.json();
+
+          if (genResult.success && genResult.attachments) {
+            generatedAttachments = genResult.attachments;
+            console.log(`[EMAIL] Generate ${generatedAttachments.length} documente pentru atașare`);
+          } else if (genResult.errors?.length > 0) {
+            toast.warning(`Atenție: ${genResult.errors.join(', ')}`);
+          }
+        }
+      }
+
+      // 2. Combină atașamentele generate cu cele manuale
+      const allAttachments = [
+        ...generatedAttachments,
+        ...attachments.map(att => ({
+          filename: att.name,
+          content: att.content,
+          contentType: att.type
+        }))
+      ];
+
+      // 3. Trimite email-ul
       const response = await fetch('/api/client-email/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -417,21 +531,20 @@ export default function SendEmailClientModal({
           template_folosit: templateSelectat,
           trimis_de: currentUser?.uid,
           trimis_de_nume: currentUser?.displayName || currentUser?.email,
-          attachments: attachments.length > 0 ? attachments.map(att => ({
-            filename: att.name,
-            content: att.content,
-            contentType: att.type
-          })) : undefined
+          attachments: allAttachments.length > 0 ? allAttachments : undefined
         })
       });
 
       const result = await response.json();
 
       if (result.success) {
-        const attachmentMsg = attachments.length > 0 ? ` (${attachments.length} atașament${attachments.length > 1 ? 'e' : ''})` : '';
+        const attachmentMsg = allAttachments.length > 0
+          ? ` (${allAttachments.length} atașament${allAttachments.length > 1 ? 'e' : ''})`
+          : '';
         toast.success(`Email trimis cu succes către ${result.deliveredTo?.length || 0} destinatar(i)${attachmentMsg}!`);
-        // Reset atașamente și refresh istoric
+        // Reset stări și refresh istoric
         setAttachments([]);
+        setSelectedDocuments(new Set());
         await loadEmailHistory();
         onClose();
       } else {
@@ -460,6 +573,11 @@ export default function SendEmailClientModal({
       return dateStr;
     }
   };
+
+  // Calculează numărul total de documente disponibile
+  const totalDocuments = documenteProiect.facturi.length +
+                         documenteProiect.contracte.length +
+                         documenteProiect.pvuri.length;
 
   if (!isOpen || !proiect) return null;
 
@@ -506,7 +624,7 @@ export default function SendEmailClientModal({
         }}>
           <div>
             <h2 style={{ margin: 0, color: 'white', fontSize: '1.25rem', fontWeight: '700' }}>
-              📧 Trimite Email Client
+              Trimite Email Client
             </h2>
             <p style={{ margin: '0.25rem 0 0 0', color: 'rgba(255, 255, 255, 0.8)', fontSize: '0.875rem' }}>
               {proiect.Client} - {proiect.Denumire}
@@ -533,7 +651,7 @@ export default function SendEmailClientModal({
               }}
               title="Vezi istoricul email-urilor trimise pentru acest proiect"
             >
-              📋 Istoric {emailHistory.length > 0 ? `(${emailHistory.length})` : ''}
+              Istoric {emailHistory.length > 0 ? `(${emailHistory.length})` : ''}
             </button>
             <button
               onClick={onClose}
@@ -697,7 +815,7 @@ export default function SendEmailClientModal({
                     border: '1px solid #fcd34d',
                     marginBottom: '0.75rem'
                   }}>
-                    ⚠️ Niciun contact salvat pentru acest client.
+                    Niciun contact salvat pentru acest client.
                     {proiect.client_email && ` Se va folosi email-ul: ${proiect.client_email}`}
                   </p>
                 )}
@@ -772,7 +890,7 @@ export default function SendEmailClientModal({
                   value={continut}
                   onChange={(e) => setContinut(e.target.value)}
                   placeholder="Conținutul email-ului..."
-                  rows={12}
+                  rows={10}
                   style={{
                     width: '100%',
                     padding: '0.75rem',
@@ -789,10 +907,223 @@ export default function SendEmailClientModal({
                 </p>
               </div>
 
-              {/* Atașamente */}
+              {/* Documente Proiect - Secțiune nouă, discretă */}
+              {totalDocuments > 0 && (
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setShowDocuments(!showDocuments)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      width: '100%',
+                      padding: '0.75rem 1rem',
+                      background: selectedDocuments.size > 0 ? '#eff6ff' : '#f9fafb',
+                      border: `1px solid ${selectedDocuments.size > 0 ? '#bfdbfe' : '#e5e7eb'}`,
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                      color: '#374151',
+                      fontWeight: '500',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span style={{ fontSize: '1rem' }}>📎</span>
+                      Documente Proiect
+                      {selectedDocuments.size > 0 && (
+                        <span style={{
+                          background: '#3b82f6',
+                          color: 'white',
+                          padding: '0.125rem 0.5rem',
+                          borderRadius: '10px',
+                          fontSize: '0.75rem',
+                          fontWeight: '600'
+                        }}>
+                          {selectedDocuments.size} selectat{selectedDocuments.size > 1 ? 'e' : ''}
+                        </span>
+                      )}
+                    </span>
+                    <span style={{
+                      transform: showDocuments ? 'rotate(180deg)' : 'rotate(0deg)',
+                      transition: 'transform 0.2s ease'
+                    }}>
+                      ▼
+                    </span>
+                  </button>
+
+                  {showDocuments && (
+                    <div style={{
+                      marginTop: '0.5rem',
+                      padding: '1rem',
+                      background: '#f9fafb',
+                      borderRadius: '8px',
+                      border: '1px solid #e5e7eb'
+                    }}>
+                      {loadingDocumente ? (
+                        <p style={{ color: '#6b7280', fontSize: '0.875rem', textAlign: 'center' }}>
+                          Se încarcă documentele...
+                        </p>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                          {/* Facturi */}
+                          {documenteProiect.facturi.length > 0 && (
+                            <div>
+                              <p style={{
+                                fontSize: '0.75rem',
+                                color: '#6b7280',
+                                marginBottom: '0.5rem',
+                                fontWeight: '600',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.05em'
+                              }}>
+                                Facturi ({documenteProiect.facturi.length})
+                              </p>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.375rem' }}>
+                                {documenteProiect.facturi.map((doc) => {
+                                  const docKey = `factura:${doc.id}`;
+                                  const isSelected = selectedDocuments.has(docKey);
+                                  return (
+                                    <button
+                                      key={doc.id}
+                                      type="button"
+                                      onClick={() => toggleDocument(docKey)}
+                                      style={{
+                                        padding: '0.375rem 0.75rem',
+                                        background: isSelected ? '#dbeafe' : 'white',
+                                        border: `1px solid ${isSelected ? '#3b82f6' : '#d1d5db'}`,
+                                        borderRadius: '6px',
+                                        cursor: 'pointer',
+                                        fontSize: '0.8rem',
+                                        color: isSelected ? '#1d4ed8' : '#374151',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.375rem',
+                                        transition: 'all 0.15s ease'
+                                      }}
+                                      title={`${doc.label} - ${doc.data} - ${doc.valoare?.toFixed(2)} RON`}
+                                    >
+                                      {isSelected && <span style={{ fontSize: '0.7rem' }}>✓</span>}
+                                      <span style={{ fontWeight: '500' }}>{doc.numar}</span>
+                                      <span style={{ color: '#9ca3af', fontSize: '0.7rem' }}>.pdf</span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Contracte */}
+                          {documenteProiect.contracte.length > 0 && (
+                            <div>
+                              <p style={{
+                                fontSize: '0.75rem',
+                                color: '#6b7280',
+                                marginBottom: '0.5rem',
+                                fontWeight: '600',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.05em'
+                              }}>
+                                Contracte ({documenteProiect.contracte.length})
+                              </p>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.375rem' }}>
+                                {documenteProiect.contracte.map((doc) => {
+                                  const docKey = `contract:${doc.id}`;
+                                  const isSelected = selectedDocuments.has(docKey);
+                                  return (
+                                    <button
+                                      key={doc.id}
+                                      type="button"
+                                      onClick={() => toggleDocument(docKey)}
+                                      style={{
+                                        padding: '0.375rem 0.75rem',
+                                        background: isSelected ? '#fef3c7' : 'white',
+                                        border: `1px solid ${isSelected ? '#f59e0b' : '#d1d5db'}`,
+                                        borderRadius: '6px',
+                                        cursor: 'pointer',
+                                        fontSize: '0.8rem',
+                                        color: isSelected ? '#b45309' : '#374151',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.375rem',
+                                        transition: 'all 0.15s ease'
+                                      }}
+                                      title={`${doc.label} - ${doc.data}`}
+                                    >
+                                      {isSelected && <span style={{ fontSize: '0.7rem' }}>✓</span>}
+                                      <span style={{ fontWeight: '500' }}>{doc.numar}</span>
+                                      <span style={{ color: '#9ca3af', fontSize: '0.7rem' }}>.docx</span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* PV-uri */}
+                          {documenteProiect.pvuri.length > 0 && (
+                            <div>
+                              <p style={{
+                                fontSize: '0.75rem',
+                                color: '#6b7280',
+                                marginBottom: '0.5rem',
+                                fontWeight: '600',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.05em'
+                              }}>
+                                Procese Verbale ({documenteProiect.pvuri.length})
+                              </p>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.375rem' }}>
+                                {documenteProiect.pvuri.map((doc) => {
+                                  const docKey = `pv:${doc.id}`;
+                                  const isSelected = selectedDocuments.has(docKey);
+                                  return (
+                                    <button
+                                      key={doc.id}
+                                      type="button"
+                                      onClick={() => toggleDocument(docKey)}
+                                      style={{
+                                        padding: '0.375rem 0.75rem',
+                                        background: isSelected ? '#dcfce7' : 'white',
+                                        border: `1px solid ${isSelected ? '#22c55e' : '#d1d5db'}`,
+                                        borderRadius: '6px',
+                                        cursor: 'pointer',
+                                        fontSize: '0.8rem',
+                                        color: isSelected ? '#15803d' : '#374151',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.375rem',
+                                        transition: 'all 0.15s ease'
+                                      }}
+                                      title={`${doc.label} - ${doc.data}`}
+                                    >
+                                      {isSelected && <span style={{ fontSize: '0.7rem' }}>✓</span>}
+                                      <span style={{ fontWeight: '500' }}>{doc.numar}</span>
+                                      <span style={{ color: '#9ca3af', fontSize: '0.7rem' }}>.docx</span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
+                          {totalDocuments === 0 && (
+                            <p style={{ color: '#6b7280', fontSize: '0.875rem', textAlign: 'center' }}>
+                              Niciun document disponibil pentru acest proiect
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Atașamente fișiere */}
               <div>
                 <label style={{ display: 'block', fontWeight: '600', color: '#374151', marginBottom: '0.5rem' }}>
-                  Atașamente
+                  Atașamente Suplimentare
                 </label>
 
                 {/* Input fișiere ascuns */}
@@ -813,36 +1144,34 @@ export default function SendEmailClientModal({
                     display: 'flex',
                     alignItems: 'center',
                     gap: '0.5rem',
-                    padding: '0.75rem 1rem',
-                    background: '#f3f4f6',
-                    border: '1px dashed #9ca3af',
-                    borderRadius: '8px',
+                    padding: '0.5rem 0.75rem',
+                    background: '#f9fafb',
+                    border: '1px dashed #d1d5db',
+                    borderRadius: '6px',
                     cursor: 'pointer',
-                    fontSize: '0.875rem',
-                    color: '#374151',
-                    width: '100%',
-                    justifyContent: 'center',
+                    fontSize: '0.8rem',
+                    color: '#6b7280',
                     transition: 'all 0.2s ease'
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.background = '#e5e7eb';
-                    e.currentTarget.style.borderColor = '#6b7280';
-                  }}
-                  onMouseLeave={(e) => {
                     e.currentTarget.style.background = '#f3f4f6';
                     e.currentTarget.style.borderColor = '#9ca3af';
                   }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = '#f9fafb';
+                    e.currentTarget.style.borderColor = '#d1d5db';
+                  }}
                 >
-                  📎 Adaugă atașament
+                  + Adaugă fișier de pe calculator
                 </button>
 
                 {/* Lista atașamentelor */}
                 {attachments.length > 0 && (
                   <div style={{
-                    marginTop: '0.75rem',
+                    marginTop: '0.5rem',
                     display: 'flex',
-                    flexDirection: 'column',
-                    gap: '0.5rem'
+                    flexWrap: 'wrap',
+                    gap: '0.375rem'
                   }}>
                     {attachments.map((att) => (
                       <div
@@ -850,35 +1179,18 @@ export default function SendEmailClientModal({
                         style={{
                           display: 'flex',
                           alignItems: 'center',
-                          justifyContent: 'space-between',
-                          padding: '0.5rem 0.75rem',
+                          gap: '0.375rem',
+                          padding: '0.375rem 0.5rem',
                           background: '#f0f9ff',
                           border: '1px solid #bae6fd',
                           borderRadius: '6px',
-                          fontSize: '0.875rem'
+                          fontSize: '0.8rem'
                         }}
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, minWidth: 0 }}>
-                          <span style={{ fontSize: '1.1rem' }}>
-                            {att.type.includes('pdf') ? '📄' :
-                             att.type.includes('image') ? '🖼️' :
-                             att.type.includes('word') || att.type.includes('document') ? '📝' :
-                             att.type.includes('excel') || att.type.includes('spreadsheet') ? '📊' :
-                             att.type.includes('zip') ? '📦' : '📎'}
-                          </span>
-                          <span style={{
-                            color: '#0369a1',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                            flex: 1
-                          }}>
-                            {att.name}
-                          </span>
-                          <span style={{ color: '#6b7280', fontSize: '0.75rem', flexShrink: 0 }}>
-                            ({formatFileSize(att.size)})
-                          </span>
-                        </div>
+                        <span style={{ color: '#0369a1', fontWeight: '500' }}>{att.name}</span>
+                        <span style={{ color: '#6b7280', fontSize: '0.7rem' }}>
+                          ({formatFileSize(att.size)})
+                        </span>
                         <button
                           type="button"
                           onClick={() => removeAttachment(att.name)}
@@ -886,27 +1198,26 @@ export default function SendEmailClientModal({
                             background: 'transparent',
                             border: 'none',
                             cursor: 'pointer',
-                            padding: '0.25rem',
-                            marginLeft: '0.5rem',
+                            padding: '0 0.25rem',
                             color: '#ef4444',
-                            fontSize: '1rem',
+                            fontSize: '0.9rem',
                             lineHeight: 1
                           }}
-                          title="Șterge atașamentul"
+                          title="Șterge"
                         >
-                          ✕
+                          ×
                         </button>
                       </div>
                     ))}
-                    <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: '#6b7280' }}>
-                      Total: {formatFileSize(getTotalAttachmentSize())} / 25 MB
-                    </p>
                   </div>
                 )}
 
-                <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.75rem', color: '#9ca3af' }}>
-                  Formate acceptate: PDF, Word, Excel, imagini, TXT, CSV, ZIP (max 10MB/fișier, 25MB total)
-                </p>
+                {(attachments.length > 0 || selectedDocuments.size > 0) && (
+                  <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.7rem', color: '#9ca3af' }}>
+                    Total atașamente: {attachments.length + selectedDocuments.size}
+                    {attachments.length > 0 && ` (${formatFileSize(getTotalAttachmentSize())} încărcat)`}
+                  </p>
+                )}
               </div>
             </div>
           )}
@@ -915,7 +1226,7 @@ export default function SendEmailClientModal({
         {/* Footer */}
         {!showHistory && (
           <div style={{
-            padding: '1.25rem 2rem',
+            padding: '1rem 2rem',
             borderTop: '1px solid #e5e7eb',
             display: 'flex',
             justifyContent: 'space-between',
@@ -940,16 +1251,16 @@ export default function SendEmailClientModal({
               }}
               title="Vezi istoricul email-urilor trimise"
             >
-              📋 <span style={{ textDecoration: 'underline' }}>Vezi istoric trimis ({emailHistory.length})</span>
+              <span style={{ textDecoration: 'underline' }}>Vezi istoric ({emailHistory.length})</span>
             </button>
 
-            <div style={{ display: 'flex', gap: '1rem' }}>
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
               <button
                 type="button"
                 onClick={onClose}
                 disabled={loading}
                 style={{
-                  padding: '0.75rem 1.5rem',
+                  padding: '0.625rem 1.25rem',
                   background: '#f3f4f6',
                   color: '#374151',
                   border: '1px solid #d1d5db',
@@ -966,7 +1277,7 @@ export default function SendEmailClientModal({
                 onClick={handleSubmit}
                 disabled={loading}
                 style={{
-                  padding: '0.75rem 1.5rem',
+                  padding: '0.625rem 1.25rem',
                   background: loading ? '#9ca3af' : 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
                   color: 'white',
                   border: 'none',
@@ -980,7 +1291,7 @@ export default function SendEmailClientModal({
                   gap: '0.5rem'
                 }}
               >
-                {loading ? '⏳ Se trimite...' : '📧 Trimite Email'}
+                {loading ? 'Se trimite...' : 'Trimite Email'}
               </button>
             </div>
           </div>
