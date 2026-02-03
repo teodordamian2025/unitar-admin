@@ -11,6 +11,8 @@
 //                         verifică încasări din Chitante_v2 în plus față de EtapeFacturi_v2
 // MODIFICAT: 28.01.2026 - FIX CRITICAL: Exclude facturi cu status_incasare='Incasat' în EtapeFacturi direct
 //                         + verificare case-insensitive pentru status factură + exclude_notificari_plata
+// MODIFICAT: 03.02.2026 - FIX: Adăugat exclude_notificari_plata și pentru secțiunea "facturi netrimise ANAF"
+//                         (lipsea verificarea - se trimiteau notificări chiar dacă factura era marcată pentru excludere)
 
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
@@ -1537,6 +1539,8 @@ export async function GET(request: NextRequest) {
         AND COALESCE(fg.is_storno, false) = false
         AND fg.stornata_de_factura_id IS NULL
         AND fg.status NOT IN ('storno', 'stornata')
+        -- ✅ FIX 03.02.2026: Exclude facturile marcate pentru excludere din notificări (la fel ca scadență)
+        AND COALESCE(fg.exclude_notificari_plata, false) = false
       ORDER BY fg.data_creare DESC
     `;
 
