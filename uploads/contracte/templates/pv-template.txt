@@ -19,4 +19,4 @@ Proiect: **{{proiect.denumire}}** {{proiect.adresa}}
 [CENTER]**S.C. UNITAR PROIECT TDA S.R.L.**[/CENTER]
 [CENTER]**DAMIAN TEODOR**[/CENTER]
 [CENTER]Administrator[/CENTER]
-[CENTER].................................[/CENTER]
+[CENTER]{{stampila_prestator}}[/CENTER]

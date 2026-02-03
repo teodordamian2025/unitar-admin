@@ -137,4 +137,4 @@ B). Va respecta termenele de plată stabilite prin prezentul contract.
 **DAMIAN TEODOR**
 Administrator
 
-.................................
+{{stampila_prestator}}

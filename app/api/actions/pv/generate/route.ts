@@ -11,6 +11,15 @@ import JSZip from 'jszip';
 import { readFile } from 'fs/promises';
 import path from 'path';
 import { getNextContractNumber } from '@/app/api/setari/contracte/route';
+// NOU: Helper pentru inserarea ștampilei în documentele DOCX
+import {
+  loadStampilaImage,
+  generateImageRelationshipXml,
+  generateContentTypesWithImage,
+  hasStampilaPlaceholder,
+  replaceStampilaPlaceholderWithMarker,
+  replaceStampilaMarkerWithDrawing
+} from '@/lib/docx-image-helper';
 
 const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
 const DATASET = 'PanouControlUnitar';
@@ -578,33 +587,41 @@ function processPVPlaceholders(text: string, data: any): string {
   return processed;
 }
 
-// PĂSTRAT identic - Conversie TXT la DOCX cu CORECTAREA [CENTER] markers
+// MODIFICAT 03.02.2026 - Conversie TXT la DOCX cu CORECTAREA [CENTER] markers + suport ștampilă
 function convertTextToWordXml(text: string): string {
-  const paragraphs = text.split('\n').map(line => {
+  // Înlocuiește placeholder-ul ștampilei cu marker temporar
+  const textWithMarker = replaceStampilaPlaceholderWithMarker(text);
+
+  const paragraphs = textWithMarker.split('\n').map(line => {
     if (line.trim() === '') {
       return '<w:p><w:pPr><w:spacing w:after="120" w:line="240" w:lineRule="auto"/></w:pPr></w:p>';
     }
-    
+
     // Detectează și procesează markerele de centrare
     const shouldCenter = line.includes('[CENTER]');
     const cleanLine = line.replace(/\[CENTER\]|\[\/CENTER\]/g, '');
     const alignment = shouldCenter ? '<w:jc w:val="center"/>' : '';
-    
+
     if (cleanLine.trim() === '') {
       return '<w:p><w:pPr><w:spacing w:after="120" w:line="240" w:lineRule="auto"/></w:pPr></w:p>';
     }
-    
+
+    // Linia cu marker-ul ștampilei - returnează marker-ul pentru înlocuire ulterioară
+    if (cleanLine.includes('___STAMPILA_PLACEHOLDER___')) {
+      return `<w:p><w:pPr>${alignment}<w:spacing w:after="120" w:line="240" w:lineRule="auto"/></w:pPr><w:r><w:t>___STAMPILA_PLACEHOLDER___</w:t></w:r></w:p>`;
+    }
+
     if (cleanLine.includes('**')) {
       let processedLine = cleanLine;
-      
+
       processedLine = processedLine.replace(/\*\*(.*?)\*\*/g, (match, content) => {
         return `<w:r><w:rPr><w:b/><w:sz w:val="24"/></w:rPr><w:t xml:space="preserve">${content}</w:t></w:r>`;
       });
-      
+
       const boldPattern = /<w:r><w:rPr><w:b\/><w:sz w:val="24"\/><\/w:rPr><w:t xml:space="preserve">.*?<\/w:t><\/w:r>/g;
       const parts = processedLine.split(boldPattern);
       const boldMatches = processedLine.match(boldPattern) || [];
-      
+
       let result = '';
       for (let i = 0; i < parts.length; i++) {
         if (parts[i].trim() || parts[i].includes(' ')) {
@@ -614,10 +631,10 @@ function convertTextToWordXml(text: string): string {
           result += boldMatches[i];
         }
       }
-      
+
       return `<w:p><w:pPr>${alignment}<w:spacing w:after="120" w:line="240" w:lineRule="auto"/></w:pPr>${result}</w:p>`;
     }
-    
+
     return `<w:p><w:pPr>${alignment}<w:spacing w:after="120" w:line="240" w:lineRule="auto"/></w:pPr><w:r><w:t xml:space="preserve">${cleanLine}</w:t></w:r></w:p>`;
   }).join('');
 
@@ -629,29 +646,59 @@ function convertTextToWordXml(text: string): string {
 </w:document>`;
 }
 
-// PĂSTRATE identic - toate funcțiile pentru template processing
+// MODIFICAT 03.02.2026 - Suport pentru inserarea ștampilei în DOCX
 async function convertTextToDocx(processedText: string): Promise<Buffer> {
   const zip = new JSZip();
-  
+  const includeStampila = hasStampilaPlaceholder(processedText);
+
+  console.log('[PV-DOCX-CONVERT] Include ștampilă:', includeStampila);
+
   zip.file('_rels/.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
 </Relationships>`);
-  
-  zip.file('[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+
+  // Content Types - cu sau fără suport PNG
+  if (includeStampila) {
+    zip.file('[Content_Types].xml', generateContentTypesWithImage());
+  } else {
+    zip.file('[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
   <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
   <Default Extension="xml" ContentType="application/xml"/>
   <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
 </Types>`);
-  
-  zip.file('word/_rels/document.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+  }
+
+  // Document relationships - cu sau fără referință la imagine
+  if (includeStampila) {
+    zip.file('word/_rels/document.xml.rels', generateImageRelationshipXml('rId2'));
+
+    // Încarcă și adaugă imaginea ștampilei
+    const stampilaBuffer = await loadStampilaImage();
+    if (stampilaBuffer) {
+      zip.file('word/media/stampila.png', stampilaBuffer);
+      console.log('[PV-DOCX-CONVERT] Ștampilă adăugată în word/media/stampila.png');
+    } else {
+      console.warn('[PV-DOCX-CONVERT] Nu s-a putut încărca ștampila, documentul va fi generat fără ea');
+    }
+  } else {
+    zip.file('word/_rels/document.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
 </Relationships>`);
-  
-  const wordXml = convertTextToWordXml(processedText);
+  }
+
+  // Generează XML-ul documentului
+  let wordXml = convertTextToWordXml(processedText);
+
+  // Înlocuiește marker-ul ștampilei cu XML-ul imaginii (dacă e necesar)
+  if (includeStampila) {
+    wordXml = replaceStampilaMarkerWithDrawing(wordXml, 'rId2');
+    console.log('[PV-DOCX-CONVERT] Marker ștampilă înlocuit cu XML imagine');
+  }
+
   zip.file('word/document.xml', wordXml);
-  
+
   return await zip.generateAsync({ type: 'nodebuffer' });
 }
 
@@ -723,7 +770,7 @@ Prin prezenta se confirmă că am predat / am primit în {{pv.numar_exemplare}} 
 [CENTER]**DAMIAN TEODOR**[/CENTER]
 [CENTER]Administrator[/CENTER]
 
-[CENTER].................................[/CENTER]`;
+[CENTER]{{stampila_prestator}}[/CENTER]`;
 
   return processPVPlaceholders(templateContent, data);
 }

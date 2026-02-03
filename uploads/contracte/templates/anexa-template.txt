@@ -86,4 +86,4 @@ Prezenta anexă are ca obiect completarea și/sau modificarea contractului princ
 **DAMIAN TEODOR**
 Administrator
 
-.................................
+{{stampila_prestator}}
