@@ -280,7 +280,18 @@ async function getFacturiCandidate(): Promise<FacturaCandidat[]> {
 }
 
 /**
- * Salvează propunerile în BigQuery
+ * Sanitize string pentru SQL - escapează caracterele speciale
+ */
+function sanitizeSQL(value: string | null | undefined): string {
+  if (value === null || value === undefined) return 'NULL';
+  // Escapează ghilimele simple pentru SQL
+  const sanitized = String(value).replace(/'/g, "''");
+  return `'${sanitized}'`;
+}
+
+/**
+ * Salvează propunerile în BigQuery folosind batch loading (nu streaming)
+ * Aceasta metodă evită problema "streaming buffer" care blochează UPDATE-uri imediate
  */
 async function savePropuneri(propuneri: any[]): Promise<void> {
   if (propuneri.length === 0) return;
@@ -294,10 +305,81 @@ async function savePropuneri(propuneri: any[]): Promise<void> {
     );
   }
 
-  const table = bigquery.dataset(DATASET).table('IncasariPropuneri_v2');
+  // Folosim SQL INSERT în loc de streaming API pentru a evita problema streaming buffer
+  // Streaming buffer blochează UPDATE-uri pe rândurile nou inserate pentru ~90 secunde
+  // Batch loading (INSERT via query) nu are această limitare
 
-  // BigQuery insert în batch
-  await table.insert(propuneri);
+  // Construim valorile pentru INSERT batch
+  const values = propuneri.map(p => {
+    return `(
+      ${sanitizeSQL(p.id)},
+      ${sanitizeSQL(p.tranzactie_id)},
+      ${sanitizeSQL(p.factura_id)},
+      ${sanitizeSQL(p.etapa_factura_id)},
+      ${p.score || 0},
+      ${p.auto_approvable === true},
+      ${p.suma_tranzactie || 0},
+      ${p.suma_factura || 0},
+      ${p.rest_de_plata || 0},
+      ${p.diferenta_ron || 0},
+      ${p.diferenta_procent || 0},
+      ${sanitizeSQL(p.matching_algorithm)},
+      ${sanitizeSQL(p.referinta_gasita)},
+      ${p.matching_details ? `JSON '${p.matching_details.replace(/'/g, "''")}'` : 'NULL'},
+      ${sanitizeSQL(p.status)},
+      ${sanitizeSQL(p.motiv_respingere)},
+      ${sanitizeSQL(p.factura_serie)},
+      ${sanitizeSQL(p.factura_numar)},
+      ${sanitizeSQL(p.factura_client_nume)},
+      ${sanitizeSQL(p.factura_client_cui)},
+      ${p.tranzactie_data ? `DATE('${p.tranzactie_data}')` : 'NULL'},
+      ${sanitizeSQL(p.tranzactie_contrapartida)},
+      ${sanitizeSQL(p.tranzactie_cui)},
+      ${sanitizeSQL(p.tranzactie_detalii)},
+      TIMESTAMP('${p.data_creare}'),
+      ${sanitizeSQL(p.creat_de)},
+      ${sanitizeSQL(p.factura_sursa)},
+      ${sanitizeSQL(p.factura_emisa_id)}
+    )`;
+  }).join(',\n');
+
+  const insertQuery = `
+    INSERT INTO \`${PROJECT_ID}.${DATASET}.IncasariPropuneri_v2\` (
+      id,
+      tranzactie_id,
+      factura_id,
+      etapa_factura_id,
+      score,
+      auto_approvable,
+      suma_tranzactie,
+      suma_factura,
+      rest_de_plata,
+      diferenta_ron,
+      diferenta_procent,
+      matching_algorithm,
+      referinta_gasita,
+      matching_details,
+      status,
+      motiv_respingere,
+      factura_serie,
+      factura_numar,
+      factura_client_nume,
+      factura_client_cui,
+      tranzactie_data,
+      tranzactie_contrapartida,
+      tranzactie_cui,
+      tranzactie_detalii,
+      data_creare,
+      creat_de,
+      factura_sursa,
+      factura_emisa_id
+    ) VALUES ${values}
+  `;
+
+  await bigquery.query({
+    query: insertQuery,
+    location: 'EU'
+  });
 }
 
 /**
