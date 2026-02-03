@@ -22,6 +22,13 @@ interface KPIData {
     change: number;
     currency: string;
   };
+  bankBalance: {
+    amount: number | null;
+    currency: string;
+    cached: boolean;
+    cacheAgeMinutes?: number;
+    stale?: boolean;
+  };
   projects: {
     active: number;
     atDeadline: number;
@@ -60,6 +67,7 @@ export default function AdminPage() {
   const [userRole, setUserRole] = useState('user');
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
+  const [isRefreshingBalance, setIsRefreshingBalance] = useState(false);
 
   useEffect(() => {
     if (loading) return;
@@ -106,14 +114,71 @@ export default function AdminPage() {
     }
   };
 
+  const loadAvailableBalance = async (forceRefresh: boolean = false): Promise<{
+    amount: number | null;
+    currency: string;
+    cached: boolean;
+    cacheAgeMinutes?: number;
+    stale?: boolean;
+  }> => {
+    try {
+      const url = forceRefresh
+        ? '/api/tranzactii/smartfintech/balance?force_refresh=true'
+        : '/api/tranzactii/smartfintech/balance';
+
+      const response = await fetch(url);
+      const data = await response.json();
+
+      if (data.success && data.balance) {
+        if (data.warning) {
+          toast.warning('Sold din cache expirat: ' + data.warning);
+        } else if (data.balance.stale) {
+          toast.warning('Sold din cache expirat. Apasă 🔄 pentru actualizare.');
+        } else if (forceRefresh) {
+          toast.success(`Sold actualizat: ${new Intl.NumberFormat('ro-RO', { style: 'currency', currency: 'RON' }).format(data.balance.total)}`);
+        }
+        return {
+          amount: data.balance.total,
+          currency: data.balance.currency || 'RON',
+          cached: data.balance.cached || false,
+          cacheAgeMinutes: data.balance.cacheAgeMinutes,
+          stale: data.balance.stale
+        };
+      } else {
+        console.warn('⚠️ Sold disponibil nu poate fi încărcat:', data.error);
+        return { amount: null, currency: 'RON', cached: false };
+      }
+    } catch (error) {
+      console.error('❌ Eroare loading available balance:', error);
+      if (forceRefresh) {
+        toast.error('Eroare la actualizarea soldului');
+      }
+      return { amount: null, currency: 'RON', cached: false };
+    }
+  };
+
+  const handleRefreshBalance = async () => {
+    setIsRefreshingBalance(true);
+    try {
+      const balanceData = await loadAvailableBalance(true);
+      setKpiData(prev => prev ? {
+        ...prev,
+        bankBalance: balanceData
+      } : null);
+    } finally {
+      setIsRefreshingBalance(false);
+    }
+  };
+
   const loadDashboardData = async () => {
     try {
       setLoadingData(true);
 
-      // Apeluri reale către BigQuery pentru date dashboard
-      const [dashboardResponse, tranzactiiResponse] = await Promise.all([
+      // Apeluri reale către BigQuery pentru date dashboard + Smart Fintech balance
+      const [dashboardResponse, tranzactiiResponse, balanceData] = await Promise.all([
         fetch('/api/rapoarte/dashboard'),
-        fetch('/api/tranzactii/dashboard')
+        fetch('/api/tranzactii/dashboard'),
+        loadAvailableBalance(false) // folosește cache dacă este disponibil
       ]);
 
       const dashboardData = await dashboardResponse.json();
@@ -129,6 +194,7 @@ export default function AdminPage() {
             change: 0, // Va fi calculat din istoricul facturilor
             currency: 'RON'
           },
+          bankBalance: balanceData,
           projects: {
             active: proiecte?.active || 0,
             atDeadline: 0, // Va fi calculat din proiectele cu deadline aproape
@@ -224,6 +290,7 @@ export default function AdminPage() {
 
         setKpiData({
           cashFlow: { amount: 0, change: 0, currency: 'RON' },
+          bankBalance: { amount: null, currency: 'RON', cached: false },
           projects: { active: 0, atDeadline: 0, total: 0 },
           invoices: { unpaid: 0, amount: 0, overdue: 0 },
           transactions: { matched: 0, total: 0, percentage: 0, unmatched: 0 }
@@ -238,6 +305,7 @@ export default function AdminPage() {
       // Fallback la date mock în caz de eroare gravă
       setKpiData({
         cashFlow: { amount: 0, change: 0, currency: 'RON' },
+        bankBalance: { amount: null, currency: 'RON', cached: false },
         projects: { active: 0, atDeadline: 0, total: 0 },
         invoices: { unpaid: 0, amount: 0, overdue: 0 },
         transactions: { matched: 0, total: 0, percentage: 0, unmatched: 0 }
@@ -291,6 +359,14 @@ export default function AdminPage() {
   return (
     <RealtimeProvider>
       <ModernLayout user={user} displayName={displayName} userRole={userRole}>
+        {/* CSS Animation for refresh button */}
+        <style>{`
+          @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+          }
+        `}</style>
+
         {/* Live Notifications */}
         <div style={{
           position: 'fixed',
@@ -426,7 +502,7 @@ export default function AdminPage() {
         gap: '1.5rem',
         marginBottom: '2rem'
       }}>
-        {/* Cash Flow Card */}
+        {/* Sold Disponibil Card - Smart Fintech API */}
         <div style={{
           background: 'rgba(255, 255, 255, 0.9)',
           backdropFilter: 'blur(20px)',
@@ -453,22 +529,32 @@ export default function AdminPage() {
             justifyContent: 'space-between',
             marginBottom: '1rem'
           }}>
-            <span style={{ fontSize: '2rem' }}>💰</span>
-            <div style={{
-              background: kpiData?.cashFlow.change && kpiData.cashFlow.change > 0
-                ? 'rgba(16, 185, 129, 0.1)'
-                : 'rgba(239, 68, 68, 0.1)',
-              color: kpiData?.cashFlow.change && kpiData.cashFlow.change > 0
-                ? '#10b981'
-                : '#ef4444',
-              padding: '0.25rem 0.5rem',
-              borderRadius: '6px',
-              fontSize: '0.75rem',
-              fontWeight: '600'
-            }}>
-              {kpiData?.cashFlow.change && kpiData.cashFlow.change > 0 ? '↗️' : '↘️'}
-              {kpiData?.cashFlow.change?.toFixed(1)}%
-            </div>
+            <span style={{ fontSize: '2rem' }}>
+              {kpiData?.bankBalance?.amount !== null && kpiData?.bankBalance?.amount !== undefined ? '🏦' : '⚠️'}
+            </span>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleRefreshBalance();
+              }}
+              disabled={isRefreshingBalance}
+              style={{
+                padding: '0.25rem 0.5rem',
+                background: 'rgba(59, 130, 246, 0.1)',
+                border: '1px solid rgba(59, 130, 246, 0.2)',
+                borderRadius: '6px',
+                fontSize: '0.875rem',
+                cursor: isRefreshingBalance ? 'not-allowed' : 'pointer',
+                opacity: isRefreshingBalance ? 0.6 : 1,
+                transition: 'all 0.2s ease'
+              }}
+              title="Actualizare sold din Smart Fintech"
+            >
+              <span style={{
+                display: 'inline-block',
+                animation: isRefreshingBalance ? 'spin 1s linear infinite' : 'none'
+              }}>🔄</span>
+            </button>
           </div>
           <h3 style={{
             margin: '0 0 0.5rem 0',
@@ -478,22 +564,31 @@ export default function AdminPage() {
             textTransform: 'uppercase',
             letterSpacing: '0.05em'
           }}>
-            Cash Flow
+            Sold Disponibil
           </h3>
           <div style={{
-            fontSize: '2rem',
+            fontSize: '1.75rem',
             fontWeight: '700',
-            color: '#1f2937',
+            color: kpiData?.bankBalance?.amount !== null && kpiData?.bankBalance?.amount !== undefined
+              ? '#1f2937'
+              : '#ef4444',
             marginBottom: '0.5rem'
           }}>
-            +{kpiData?.cashFlow.amount.toLocaleString()} {kpiData?.cashFlow.currency}
+            {kpiData?.bankBalance?.amount !== null && kpiData?.bankBalance?.amount !== undefined
+              ? new Intl.NumberFormat('ro-RO', {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2
+                }).format(kpiData.bankBalance.amount) + ' RON'
+              : 'Indisponibil'}
           </div>
           <p style={{
             margin: 0,
-            fontSize: '0.8rem',
+            fontSize: '0.75rem',
             color: '#6b7280'
           }}>
-            Vezi detalii →
+            {kpiData?.bankBalance?.amount !== null && kpiData?.bankBalance?.amount !== undefined
+              ? 'Smart Fintech API (cache 6h)'
+              : 'Eroare la încărcare'}
           </p>
         </div>
 
