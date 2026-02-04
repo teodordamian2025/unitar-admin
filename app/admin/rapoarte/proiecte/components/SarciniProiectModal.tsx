@@ -406,6 +406,8 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect, defaultT
     }
   };
 
+  // OPTIMISTIC UI UPDATE - 04.02.2026
+  // Actualizăm UI instant, apoi trimitem request în background
   const handleAddComentariu = async () => {
     if (!newComentariu.trim()) {
       showToast('Comentariul nu poate fi gol', 'error');
@@ -417,37 +419,56 @@ export default function SarciniProiectModal({ isOpen, onClose, proiect, defaultT
       return;
     }
 
+    // 1. Generăm ID-ul și creăm comentariul optimist
+    const comentariuId = `COM_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+    const comentariuOptimist: Comentariu = {
+      id: comentariuId,
+      proiect_id: proiect.ID_Proiect,
+      autor_uid: utilizatorCurent.uid,
+      autor_nume: utilizatorCurent.nume_complet,
+      comentariu: newComentariu.trim(),
+      data_comentariu: new Date().toISOString(),
+      tip_comentariu: tipComentariu
+    };
+
+    // 2. Salvăm starea anterioară pentru rollback
+    const previousComentarii = [...comentarii];
+    const savedComentariu = newComentariu.trim();
+    const savedTipComentariu = tipComentariu;
+
+    // 3. Actualizăm UI instant (optimistic update)
+    setComentarii([comentariuOptimist, ...comentarii]);
+    setNewComentariu('');
+    setTipComentariu('General');
+    showToast('Comentariu adăugat!', 'success');
+
+    // 4. Trimitem request în background
     try {
-      setLoading(true);
       const response = await fetch('/api/rapoarte/comentarii', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          id: `COM_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+          id: comentariuId,
           proiect_id: proiect.ID_Proiect,
           tip_proiect: proiect.tip || 'proiect',
           autor_uid: utilizatorCurent.uid,
           autor_nume: utilizatorCurent.nume_complet,
-          comentariu: newComentariu.trim(),
-          tip_comentariu: tipComentariu
+          comentariu: savedComentariu,
+          tip_comentariu: savedTipComentariu
         })
       });
 
       const result = await response.json();
-      
-      if (result.success) {
-        showToast('Comentariu adăugat cu succes', 'success');
-        setNewComentariu('');
-        setTipComentariu('General');
-        await loadComentarii();
-      } else {
-        showToast(result.error || 'Eroare la adăugarea comentariului', 'error');
+
+      if (!result.success) {
+        throw new Error(result.error || 'Eroare la salvarea comentariului');
       }
+      // Success - comentariul este deja afișat, nu mai facem nimic
     } catch (error) {
+      // 5. Rollback în caz de eroare
       console.error('Eroare la adăugarea comentariului:', error);
-      showToast('Eroare la adăugarea comentariului', 'error');
-    } finally {
-      setLoading(false);
+      setComentarii(previousComentarii);
+      showToast('Eroare la salvarea comentariului. Încercați din nou.', 'error');
     }
   };
 

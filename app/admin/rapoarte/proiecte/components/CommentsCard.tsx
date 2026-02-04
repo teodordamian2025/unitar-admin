@@ -54,7 +54,6 @@ function CommentsCardComponent({
   const [showReplyModal, setShowReplyModal] = useState(false);
   const [newComentariu, setNewComentariu] = useState('');
   const [tipComentariu, setTipComentariu] = useState('General');
-  const [submitting, setSubmitting] = useState(false);
   const [utilizatorCurent, setUtilizatorCurent] = useState<UtilizatorCurent | null>(null);
   const [mounted, setMounted] = useState(false);
 
@@ -129,16 +128,39 @@ function CommentsCardComponent({
     }
   };
 
+  // OPTIMISTIC UI UPDATE - 04.02.2026
+  // Actualizăm UI instant, apoi trimitem request în background
   const handleSubmitComentariu = async () => {
     if (!newComentariu.trim() || !utilizatorCurent) {
       toast.error('Completați comentariul');
       return;
     }
 
-    setSubmitting(true);
-    try {
-      const comentariuId = `com_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // 1. Generăm ID-ul și creăm comentariul optimist
+    const comentariuId = `com_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const comentariuOptimist: Comentariu = {
+      id: comentariuId,
+      proiect_id: proiectId,
+      autor_uid: utilizatorCurent.uid,
+      autor_nume: utilizatorCurent.nume_complet,
+      comentariu: newComentariu.trim(),
+      data_comentariu: new Date().toISOString(),
+      tip_comentariu: tipComentariu
+    };
 
+    // 2. Salvăm starea anterioară pentru rollback
+    const previousComentarii = [...comentarii];
+    const savedComentariu = newComentariu.trim();
+    const savedTipComentariu = tipComentariu;
+
+    // 3. Actualizăm UI instant (optimistic update)
+    setComentarii([comentariuOptimist, ...comentarii]);
+    setNewComentariu('');
+    setShowReplyModal(false);
+    toast.success('Comentariu adăugat!');
+
+    // 4. Trimitem request în background
+    try {
       const response = await fetch('/api/rapoarte/comentarii', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -148,26 +170,22 @@ function CommentsCardComponent({
           tip_proiect: tipProiect,
           autor_uid: utilizatorCurent.uid,
           autor_nume: utilizatorCurent.nume_complet,
-          comentariu: newComentariu.trim(),
-          tip_comentariu: tipComentariu
+          comentariu: savedComentariu,
+          tip_comentariu: savedTipComentariu
         })
       });
 
       const data = await response.json();
 
-      if (data.success) {
-        toast.success('Comentariu adăugat cu succes!');
-        setNewComentariu('');
-        setShowReplyModal(false);
-        loadComentarii();
-      } else {
-        throw new Error(data.error || 'Eroare la adăugarea comentariului');
+      if (!data.success) {
+        throw new Error(data.error || 'Eroare la salvarea comentariului');
       }
+      // Success - comentariul este deja afișat, nu mai facem nimic
     } catch (error) {
+      // 5. Rollback în caz de eroare
       console.error('Eroare la adăugarea comentariului:', error);
-      toast.error(error instanceof Error ? error.message : 'Eroare la adăugarea comentariului');
-    } finally {
-      setSubmitting(false);
+      setComentarii(previousComentarii);
+      toast.error(error instanceof Error ? error.message : 'Eroare la salvarea comentariului. Încercați din nou.');
     }
   };
 
@@ -462,20 +480,20 @@ function CommentsCardComponent({
                 </button>
                 <button
                   onClick={handleSubmitComentariu}
-                  disabled={submitting || !newComentariu.trim()}
+                  disabled={!newComentariu.trim()}
                   style={{
                     padding: '0.625rem 1.25rem',
-                    background: submitting ? '#9ca3af' : 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                    background: !newComentariu.trim() ? '#9ca3af' : 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
                     color: 'white',
                     border: 'none',
                     borderRadius: '8px',
-                    cursor: submitting ? 'not-allowed' : 'pointer',
+                    cursor: !newComentariu.trim() ? 'not-allowed' : 'pointer',
                     fontSize: '0.875rem',
                     fontWeight: '500',
                     boxShadow: '0 2px 8px rgba(59, 130, 246, 0.3)'
                   }}
                 >
-                  {submitting ? 'Se salvează...' : '💬 Trimite'}
+                  💬 Trimite
                 </button>
               </div>
             </div>

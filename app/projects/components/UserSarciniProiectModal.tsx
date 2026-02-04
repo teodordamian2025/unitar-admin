@@ -330,36 +330,56 @@ export default function UserSarciniProiectModal({ isOpen, onClose, proiect, defa
     }
   };
 
-  // Funcții pentru comentarii - IDENTICE cu admin
+  // OPTIMISTIC UI UPDATE - 04.02.2026
+  // Actualizăm UI instant, apoi trimitem request în background
   const handleAddComentariu = async () => {
     if (!newComentariu.trim() || !utilizatorCurent) return;
 
-    setLoading(true);
+    // 1. Generăm ID-ul și creăm comentariul optimist
+    const comentariuId = `COM_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+    const comentariuOptimist: Comentariu = {
+      id: comentariuId,
+      proiect_id: proiect.ID_Proiect,
+      tip_comentariu: tipComentariu,
+      comentariu: newComentariu.trim(),
+      autor_uid: utilizatorCurent.uid,
+      autor_nume: utilizatorCurent.nume_complet,
+      data_comentariu: new Date().toISOString()
+    };
+
+    // 2. Salvăm starea anterioară pentru rollback
+    const previousComentarii = [...comentarii];
+    const savedComentariu = newComentariu.trim();
+    const savedTipComentariu = tipComentariu;
+
+    // 3. Actualizăm UI instant (optimistic update)
+    setComentarii([comentariuOptimist, ...comentarii]);
+    setNewComentariu('');
+    showToast('Comentariu adăugat!', 'success');
+
+    // 4. Trimitem request în background
     try {
       const response = await fetch('/api/user/comentarii', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           proiect_id: proiect.ID_Proiect,
-          tip_comentariu: tipComentariu,
-          comentariu: newComentariu.trim(),
+          tip_comentariu: savedTipComentariu,
+          comentariu: savedComentariu,
           autor_uid: utilizatorCurent.uid,
           autor_nume: utilizatorCurent.nume_complet
         })
       });
 
-      if (response.ok) {
-        setNewComentariu('');
-        await loadComentarii();
-        showToast('Comentariu adăugat cu succes', 'success');
-      } else {
-        throw new Error('Eroare la adăugarea comentariului');
+      if (!response.ok) {
+        throw new Error('Eroare la salvarea comentariului');
       }
+      // Success - comentariul este deja afișat, nu mai facem nimic
     } catch (error) {
+      // 5. Rollback în caz de eroare
       console.error('Eroare la adăugarea comentariului:', error);
-      showToast('Eroare la adăugarea comentariului', 'error');
-    } finally {
-      setLoading(false);
+      setComentarii(previousComentarii);
+      showToast('Eroare la salvarea comentariului. Încercați din nou.', 'error');
     }
   };
 
