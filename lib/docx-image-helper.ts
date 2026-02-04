@@ -130,9 +130,10 @@ export function replaceStampilaPlaceholderWithMarker(text: string): string {
  */
 export function replaceStampilaMarkerWithDrawing(xml: string, relationshipId: string = 'rId2'): string {
   const imageXml = generateImageDrawingXml(relationshipId);
-  // Înlocuiește paragraful care conține marker-ul cu XML-ul imaginii
-  // Folosim [\s\S] în loc de . cu flag 's' pentru compatibilitate ES2017
-  const markerPattern = /<w:p[^>]*>[\s\S]*?___STAMPILA_PLACEHOLDER___[\s\S]*?<\/w:p>/g;
+  // Înlocuiește DOAR paragraful care conține marker-ul cu XML-ul imaginii
+  // Folosim negative lookahead (?!<\/w:p>) pentru a nu traversa granițele paragrafelor
+  // Astfel, regex-ul matchuiește doar de la <w:p> la </w:p> fără să treacă peste alte paragrafe
+  const markerPattern = /<w:p[^>]*>(?:(?!<\/w:p>)[\s\S])*___STAMPILA_PLACEHOLDER___(?:(?!<\/w:p>)[\s\S])*<\/w:p>/g;
   return xml.replace(markerPattern, imageXml);
 }
 
