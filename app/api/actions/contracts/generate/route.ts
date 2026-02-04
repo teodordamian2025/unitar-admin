@@ -1221,7 +1221,9 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
     const dataStart = contractInfo.proiect.Data_Start;
     const dataFinal = contractInfo.proiect.Data_Final;
     
-    const dataSemnare = formatDateForBigQuery(new Date().toISOString().split('T')[0]);
+    // Folosește data custom dacă e furnizată, altfel data curentă
+    const dataContractFinal = contractInfo.dataContract || new Date().toISOString().split('T')[0];
+    const dataSemnare = formatDateForBigQuery(dataContractFinal);
     const dataExpirare = formatDateForBigQuery(
       dataFinal && typeof dataFinal === 'object' && dataFinal.value ? dataFinal.value :
       typeof dataFinal === 'string' ? dataFinal : null
@@ -1260,7 +1262,7 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
 	      Observatii = @observatii,
 	      versiune = versiune + 1,
 	      Status = 'Activ',
-	      data_contract = @dataContractCustom
+	      Data_Semnare = @dataSemnare
 	    WHERE ID_Contract = @contractId
 	  `;
 
@@ -1283,7 +1285,7 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
 	      placeholderData: contractInfo.placeholderData
 	    }),
 	    observatii: sanitizeStringForBigQuery(contractInfo.observatii),
-	    dataContractCustom: contractInfo.dataContract || null // NOU: Data contract custom
+	    dataSemnare: dataSemnare
 	  };
 
 	  console.log(`[CONTRACT-UPDATE] Actualizare contract ${contractInfo.contractExistentId} cu Status = 'Activ' (reactivare după ștergere)`);
@@ -1304,7 +1306,7 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
 	      articoleSuplimentare: 'STRING',
 	      continutJson: 'STRING',
 	      observatii: 'STRING',
-	      dataContractCustom: 'DATE' // NOU: Tip pentru data contract
+	      dataSemnare: 'DATE'
 	    },
 	    location: 'EU',
 	  });
@@ -1318,14 +1320,14 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
          client_id, client_nume, Denumire_Contract, Data_Semnare, Data_Expirare,
          Status, Valoare, Moneda, curs_valutar, data_curs_valutar, valoare_ron,
          articole_suplimentare, data_creare, data_actualizare,
-         continut_json, Observatii, versiune, data_contract)
+         continut_json, Observatii, versiune)
         VALUES
         (@contractId, @numarContract, @serieContract, @tipDocument, @proiectId,
          @clientId, @clientNume, @denumireContract, @dataSemnare, @dataExpirare,
          @status, CAST(@valoare AS NUMERIC), @moneda, @cursValutar, @dataCurs, CAST(@valoareRon AS NUMERIC),
          PARSE_JSON(@articoleSuplimentare),
          CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(),
-         PARSE_JSON(@continutJson), @observatii, @versiune, @dataContractCustom)
+         PARSE_JSON(@continutJson), @observatii, @versiune)
       `;
 
       const parametriiInsert = {
@@ -1354,8 +1356,7 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
           placeholderData: contractInfo.placeholderData
         }),
         observatii: sanitizeStringForBigQuery(contractInfo.observatii),
-        versiune: 1,
-        dataContractCustom: contractInfo.dataContract || null // NOU: Data contract custom
+        versiune: 1
       };
 
       await bigquery.query({
@@ -1381,8 +1382,7 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
 	    articoleSuplimentare: 'STRING',
 	    continutJson: 'STRING',
 	    observatii: 'STRING',
-	    versiune: 'INT64',
-	    dataContractCustom: 'DATE' // NOU: Tip pentru data contract
+	    versiune: 'INT64'
 	  },
 	  location: 'EU',
 	});
