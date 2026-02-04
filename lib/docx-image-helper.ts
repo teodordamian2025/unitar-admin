@@ -50,17 +50,18 @@ export function generateContentTypesWithImage(): string {
 
 /**
  * Generează XML-ul pentru inserarea imaginii în document
- * Dimensiuni: ~4cm lățime, păstrând proporțiile
+ * Dimensiuni: 4.9cm lățime x 3.57cm înălțime (conform specificații)
  * EMU (English Metric Units): 1 inch = 914400 EMU, 1 cm = 360000 EMU
+ * Twips: 1 cm = 567 twips (pentru spacing)
  *
  * @param relationshipId - ID-ul relației (default: rId2)
- * @param widthCm - Lățimea imaginii în cm (default: 4)
- * @param heightCm - Înălțimea imaginii în cm (default: 4)
+ * @param widthCm - Lățimea imaginii în cm (default: 4.9)
+ * @param heightCm - Înălțimea imaginii în cm (default: 3.57)
  */
 export function generateImageDrawingXml(
   relationshipId: string = 'rId2',
-  widthCm: number = 4,
-  heightCm: number = 4
+  widthCm: number = 4.9,
+  heightCm: number = 3.57
 ): string {
   // Conversie cm la EMU
   const widthEmu = Math.round(widthCm * 360000);
@@ -68,7 +69,7 @@ export function generateImageDrawingXml(
 
   return `<w:p>
   <w:pPr>
-    <w:spacing w:after="120" w:line="240" w:lineRule="auto"/>
+    <w:spacing w:before="-1134" w:after="120" w:line="240" w:lineRule="auto"/>
   </w:pPr>
   <w:r>
     <w:drawing>
