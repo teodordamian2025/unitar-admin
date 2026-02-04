@@ -113,9 +113,6 @@ export default function UserProiectNouModal({ isOpen, onClose, onProiectCreated 
 
       setClientSearch('');
       setResponsabiliSelectati([]);
-
-      // Generare ID proiect automat
-      generateProjectId();
     }
   }, [isOpen]);
 
@@ -129,17 +126,6 @@ export default function UserProiectNouModal({ isOpen, onClose, onProiectCreated 
     } catch (error) {
       console.error('Eroare la încărcarea clienților:', error);
     }
-  };
-
-  const generateProjectId = () => {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = (now.getMonth() + 1).toString().padStart(2, '0');
-    const day = now.getDate().toString().padStart(2, '0');
-    const time = now.getTime().toString().slice(-4);
-
-    const projectId = `PRJ-${year}${month}${day}-${time}`;
-    setFormData(prev => ({ ...prev, ID_Proiect: projectId }));
   };
 
   const handleInputChange = (field: keyof FormData, value: string) => {
@@ -403,7 +389,7 @@ export default function UserProiectNouModal({ isOpen, onClose, onProiectCreated 
                 value={formData.ID_Proiect}
                 onChange={(e) => handleInputChange('ID_Proiect', e.target.value)}
                 style={inputStyle}
-                placeholder="PRJ-20251007-1234"
+                placeholder="Nume folder proiect din pcloud"
                 required
               />
             </div>
