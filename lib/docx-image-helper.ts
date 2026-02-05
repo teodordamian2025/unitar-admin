@@ -54,28 +54,50 @@ export function generateContentTypesWithImage(): string {
  * EMU (English Metric Units): 1 inch = 914400 EMU, 1 cm = 360000 EMU
  * Twips: 1 cm = 567 twips (pentru spacing)
  *
+ * IMPORTANT: Folosește wp:anchor cu wrapNone pentru "In Front of Text"
+ * Aceasta permite imaginii să plutească deasupra textului și să fie mutată liber
+ *
  * @param relationshipId - ID-ul relației (default: rId2)
  * @param widthCm - Lățimea imaginii în cm (default: 4.9)
  * @param heightCm - Înălțimea imaginii în cm (default: 3.57)
+ * @param offsetXCm - Offset orizontal de la marginea stângă în cm (default: 0)
+ * @param offsetYCm - Offset vertical de la poziția curentă în cm (default: -1.5 pentru a se suprapune cu semnătura)
  */
 export function generateImageDrawingXml(
   relationshipId: string = 'rId2',
   widthCm: number = 4.9,
-  heightCm: number = 3.57
+  heightCm: number = 3.57,
+  offsetXCm: number = 0,
+  offsetYCm: number = -1.5
 ): string {
-  // Conversie cm la EMU
+  // Conversie cm la EMU (1 cm = 360000 EMU)
   const widthEmu = Math.round(widthCm * 360000);
   const heightEmu = Math.round(heightCm * 360000);
+  const offsetXEmu = Math.round(offsetXCm * 360000);
+  const offsetYEmu = Math.round(offsetYCm * 360000);
 
+  // wp:anchor permite "floating" image cu wrapNone = "In Front of Text"
+  // behindDoc="0" = imaginea este în fața textului (nu în spate)
+  // relativeHeight="251658240" = z-index mare pentru a fi deasupra
+  // simplePos="0" = folosește pozitionare relativă, nu absolută
+  // allowOverlap="1" = permite suprapunere cu alte elemente
   return `<w:p>
-  <w:pPr>
-    <w:spacing w:before="-1134" w:after="120" w:line="240" w:lineRule="auto"/>
-  </w:pPr>
   <w:r>
     <w:drawing>
-      <wp:inline distT="0" distB="0" distL="0" distR="0" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">
+      <wp:anchor distT="0" distB="0" distL="114300" distR="114300"
+                 simplePos="0" relativeHeight="251658240" behindDoc="0"
+                 locked="0" layoutInCell="1" allowOverlap="1"
+                 xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">
+        <wp:simplePos x="0" y="0"/>
+        <wp:positionH relativeFrom="column">
+          <wp:posOffset>${offsetXEmu}</wp:posOffset>
+        </wp:positionH>
+        <wp:positionV relativeFrom="paragraph">
+          <wp:posOffset>${offsetYEmu}</wp:posOffset>
+        </wp:positionV>
         <wp:extent cx="${widthEmu}" cy="${heightEmu}"/>
         <wp:effectExtent l="0" t="0" r="0" b="0"/>
+        <wp:wrapNone/>
         <wp:docPr id="1" name="Stampila" descr="Stampila UNITAR PROIECT"/>
         <wp:cNvGraphicFramePr>
           <a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/>
@@ -105,7 +127,7 @@ export function generateImageDrawingXml(
             </pic:pic>
           </a:graphicData>
         </a:graphic>
-      </wp:inline>
+      </wp:anchor>
     </w:drawing>
   </w:r>
 </w:p>`;
