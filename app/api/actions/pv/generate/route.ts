@@ -692,9 +692,13 @@ async function convertTextToDocx(processedText: string): Promise<Buffer> {
   let wordXml = convertTextToWordXml(processedText);
 
   // Înlocuiește marker-ul ștampilei cu XML-ul imaginii (dacă e necesar)
+  // Pentru PV, ștampila este centrată deoarece textul semnăturii este centrat
   if (includeStampila) {
-    wordXml = replaceStampilaMarkerWithDrawing(wordXml, 'rId2');
-    console.log('[PV-DOCX-CONVERT] Marker ștampilă înlocuit cu XML imagine');
+    wordXml = replaceStampilaMarkerWithDrawing(wordXml, {
+      relationshipId: 'rId2',
+      centerHorizontally: true
+    });
+    console.log('[PV-DOCX-CONVERT] Marker ștampilă înlocuit cu XML imagine (centrat)');
   }
 
   zip.file('word/document.xml', wordXml);

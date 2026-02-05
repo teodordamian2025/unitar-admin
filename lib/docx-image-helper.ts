@@ -49,6 +49,18 @@ export function generateContentTypesWithImage(): string {
 }
 
 /**
+ * Opțiuni pentru generarea XML-ului imaginii
+ */
+export interface ImageDrawingOptions {
+  relationshipId?: string;  // ID-ul relației (default: rId2)
+  widthCm?: number;         // Lățimea imaginii în cm (default: 4.9)
+  heightCm?: number;        // Înălțimea imaginii în cm (default: 3.57)
+  offsetXCm?: number;       // Offset orizontal în cm (default: 0, ignorat dacă centerHorizontally=true)
+  offsetYCm?: number;       // Offset vertical în cm (default: -1.5)
+  centerHorizontally?: boolean; // Centrează imaginea orizontal (default: false)
+}
+
+/**
  * Generează XML-ul pentru inserarea imaginii în document
  * Dimensiuni: 4.9cm lățime x 3.57cm înălțime (conform specificații)
  * EMU (English Metric Units): 1 inch = 914400 EMU, 1 cm = 360000 EMU
@@ -57,24 +69,32 @@ export function generateContentTypesWithImage(): string {
  * IMPORTANT: Folosește wp:anchor cu wrapNone pentru "In Front of Text"
  * Aceasta permite imaginii să plutească deasupra textului și să fie mutată liber
  *
- * @param relationshipId - ID-ul relației (default: rId2)
- * @param widthCm - Lățimea imaginii în cm (default: 4.9)
- * @param heightCm - Înălțimea imaginii în cm (default: 3.57)
- * @param offsetXCm - Offset orizontal de la marginea stângă în cm (default: 0)
- * @param offsetYCm - Offset vertical de la poziția curentă în cm (default: -1.5 pentru a se suprapune cu semnătura)
+ * @param options - Opțiuni pentru imagine (vezi ImageDrawingOptions)
  */
-export function generateImageDrawingXml(
-  relationshipId: string = 'rId2',
-  widthCm: number = 4.9,
-  heightCm: number = 3.57,
-  offsetXCm: number = 0,
-  offsetYCm: number = -1.5
-): string {
+export function generateImageDrawingXml(options: ImageDrawingOptions = {}): string {
+  const {
+    relationshipId = 'rId2',
+    widthCm = 4.9,
+    heightCm = 3.57,
+    offsetXCm = 0,
+    offsetYCm = -1.5,
+    centerHorizontally = false
+  } = options;
+
   // Conversie cm la EMU (1 cm = 360000 EMU)
   const widthEmu = Math.round(widthCm * 360000);
   const heightEmu = Math.round(heightCm * 360000);
   const offsetXEmu = Math.round(offsetXCm * 360000);
   const offsetYEmu = Math.round(offsetYCm * 360000);
+
+  // Poziționare orizontală: centrată sau cu offset
+  const positionHXml = centerHorizontally
+    ? `<wp:positionH relativeFrom="margin">
+          <wp:align>center</wp:align>
+        </wp:positionH>`
+    : `<wp:positionH relativeFrom="column">
+          <wp:posOffset>${offsetXEmu}</wp:posOffset>
+        </wp:positionH>`;
 
   // wp:anchor permite "floating" image cu wrapNone = "In Front of Text"
   // behindDoc="0" = imaginea este în fața textului (nu în spate)
@@ -89,9 +109,7 @@ export function generateImageDrawingXml(
                  locked="0" layoutInCell="1" allowOverlap="1"
                  xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">
         <wp:simplePos x="0" y="0"/>
-        <wp:positionH relativeFrom="column">
-          <wp:posOffset>${offsetXEmu}</wp:posOffset>
-        </wp:positionH>
+        ${positionHXml}
         <wp:positionV relativeFrom="paragraph">
           <wp:posOffset>${offsetYEmu}</wp:posOffset>
         </wp:positionV>
@@ -150,9 +168,19 @@ export function replaceStampilaPlaceholderWithMarker(text: string): string {
 
 /**
  * Înlocuiește marker-ul temporar cu XML-ul imaginii în documentul final
+ * @param xml - XML-ul documentului
+ * @param options - Opțiuni pentru imagine (relationshipId, centerHorizontally, etc.)
  */
-export function replaceStampilaMarkerWithDrawing(xml: string, relationshipId: string = 'rId2'): string {
-  const imageXml = generateImageDrawingXml(relationshipId);
+export function replaceStampilaMarkerWithDrawing(
+  xml: string,
+  options: ImageDrawingOptions | string = 'rId2'
+): string {
+  // Backwards compatibility: dacă options este string, e relationshipId
+  const imageOptions: ImageDrawingOptions = typeof options === 'string'
+    ? { relationshipId: options }
+    : options;
+
+  const imageXml = generateImageDrawingXml(imageOptions);
   // Înlocuiește DOAR paragraful care conține marker-ul cu XML-ul imaginii
   // Folosim negative lookahead (?!<\/w:p>) pentru a nu traversa granițele paragrafelor
   // Astfel, regex-ul matchuiește doar de la <w:p> la </w:p> fără să treacă peste alte paragrafe
