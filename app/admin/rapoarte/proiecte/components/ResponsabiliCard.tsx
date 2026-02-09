@@ -120,17 +120,36 @@ export default function ResponsabiliCard({
       return;
     }
 
-    setSubmitting(true);
-    try {
-      const newId = `resp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      const rolField = getRolField();
+    const newId = `resp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const rolField = getRolField();
+    const userToAdd = selectedUser;
+    const rolToAdd = selectedRol;
 
+    // Optimistic UI: update imediat + close modal
+    const previousResponsabili = [...responsabili];
+    const optimisticResponsabil: Responsabil = {
+      id: newId,
+      responsabil_uid: userToAdd.uid,
+      responsabil_nume: userToAdd.nume_complet,
+      [rolField]: rolToAdd,
+      email: userToAdd.email || '',
+      prenume: userToAdd.prenume || '',
+      nume: userToAdd.nume || ''
+    };
+    setResponsabili(prev => [...prev, optimisticResponsabil]);
+    setShowAddModal(false);
+    setSelectedUser(null);
+    setSelectedRol('Normal');
+    toast.success('Responsabil adăugat cu succes!');
+
+    // API call în background
+    try {
       const payload: any = {
         id: newId,
         [getIdParam()]: entityId,
-        responsabil_uid: selectedUser.uid,
-        responsabil_nume: selectedUser.nume_complet,
-        [rolField]: selectedRol
+        responsabil_uid: userToAdd.uid,
+        responsabil_nume: userToAdd.nume_complet,
+        [rolField]: rolToAdd
       };
 
       const response = await fetch(getApiEndpoint(), {
@@ -141,28 +160,31 @@ export default function ResponsabiliCard({
 
       const data = await response.json();
 
-      if (data.success) {
-        toast.success('Responsabil adăugat cu succes!');
-        setShowAddModal(false);
-        setSelectedUser(null);
-        setSelectedRol('Normal');
-        loadResponsabili();
-        onUpdate?.();
+      if (!data.success) {
+        // Rollback
+        setResponsabili(previousResponsabili);
+        toast.error(data.error || 'Eroare la adăugarea responsabilului');
       } else {
-        throw new Error(data.error || 'Eroare la adăugarea responsabilului');
+        // Sync în background
+        onUpdate?.();
       }
     } catch (error) {
+      // Rollback
+      setResponsabili(previousResponsabili);
       console.error('Eroare la adăugarea responsabilului:', error);
-      toast.error(error instanceof Error ? error.message : 'Eroare la adăugarea responsabilului');
-    } finally {
-      setSubmitting(false);
+      toast.error('Eroare la adăugarea responsabilului');
     }
   };
 
   const handleRemoveResponsabil = async (responsabilId: string) => {
     if (!confirm('Sigur doriți să eliminați acest responsabil?')) return;
 
-    setDeletingId(responsabilId);
+    // Optimistic UI: remove imediat din listă
+    const previousResponsabili = [...responsabili];
+    setResponsabili(prev => prev.filter(r => r.id !== responsabilId));
+    toast.success('Responsabil eliminat!');
+
+    // API call în background
     try {
       const params = new URLSearchParams({ id: responsabilId });
       const response = await fetch(`${getApiEndpoint()}?${params.toString()}`, {
@@ -171,18 +193,19 @@ export default function ResponsabiliCard({
 
       const data = await response.json();
 
-      if (data.success) {
-        toast.success('Responsabil eliminat!');
-        loadResponsabili();
-        onUpdate?.();
+      if (!data.success) {
+        // Rollback
+        setResponsabili(previousResponsabili);
+        toast.error(data.error || 'Eroare la eliminarea responsabilului');
       } else {
-        throw new Error(data.error || 'Eroare la eliminarea responsabilului');
+        // Sync în background
+        onUpdate?.();
       }
     } catch (error) {
+      // Rollback
+      setResponsabili(previousResponsabili);
       console.error('Eroare la eliminarea responsabilului:', error);
-      toast.error(error instanceof Error ? error.message : 'Eroare la eliminarea responsabilului');
-    } finally {
-      setDeletingId(null);
+      toast.error('Eroare la eliminarea responsabilului');
     }
   };
 

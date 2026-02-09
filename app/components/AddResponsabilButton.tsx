@@ -14,7 +14,7 @@ import { toast } from 'react-toastify';
 interface AddResponsabilButtonProps {
   entityType: 'proiect' | 'subproiect' | 'sarcina';
   entityId: string;
-  onResponsabilAdded?: () => void;
+  onResponsabilAdded?: (addedUser?: { uid: string; nume_complet: string; rol: string }) => void;
   existingResponsabili?: Array<{ uid: string; nume_complet: string }>;
   buttonSize?: 'small' | 'medium';
   showLabel?: boolean;
@@ -134,9 +134,20 @@ export default function AddResponsabilButton({
   };
 
   const handleSelectUser = async (user: Utilizator) => {
-    setSaving(true);
+    const rolToAdd = selectedRole;
+
+    // Optimistic UI: close dropdown imediat + toast success
+    setIsOpen(false);
+    setSearchTerm('');
+    toast.success(`${user.nume_complet} adaugat ca responsabil`);
+
+    // Notifică parent-ul optimistic cu datele noului responsabil
+    if (onResponsabilAdded) {
+      onResponsabilAdded({ uid: user.uid, nume_complet: user.nume_complet, rol: rolToAdd });
+    }
+
+    // API call în background
     try {
-      // Determina API endpoint-ul bazat pe tipul entitatii
       let apiEndpoint = '';
       let payload: any = {};
 
@@ -150,7 +161,7 @@ export default function AddResponsabilButton({
             proiect_id: entityId,
             responsabil_uid: user.uid,
             responsabil_nume: user.nume_complet,
-            rol_in_proiect: selectedRole
+            rol_in_proiect: rolToAdd
           };
           break;
         case 'subproiect':
@@ -160,7 +171,7 @@ export default function AddResponsabilButton({
             subproiect_id: entityId,
             responsabil_uid: user.uid,
             responsabil_nume: user.nume_complet,
-            rol_in_subproiect: selectedRole
+            rol_in_subproiect: rolToAdd
           };
           break;
         case 'sarcina':
@@ -170,7 +181,7 @@ export default function AddResponsabilButton({
             sarcina_id: entityId,
             responsabil_uid: user.uid,
             responsabil_nume: user.nume_complet,
-            rol_in_sarcina: selectedRole
+            rol_in_sarcina: rolToAdd
           };
           break;
       }
@@ -183,21 +194,20 @@ export default function AddResponsabilButton({
 
       const result = await response.json();
 
-      if (result.success) {
-        toast.success(`${user.nume_complet} adaugat ca responsabil`);
-        setIsOpen(false);
-        setSearchTerm('');
+      if (!result.success) {
+        toast.error(result.error || 'Eroare la adaugarea responsabilului');
+        // Rollback: reîncarcă lista de proiecte
         if (onResponsabilAdded) {
           onResponsabilAdded();
         }
-      } else {
-        toast.error(result.error || 'Eroare la adaugarea responsabilului');
       }
     } catch (error) {
       console.error('Eroare la adaugarea responsabilului:', error);
       toast.error('Eroare la adaugarea responsabilului');
-    } finally {
-      setSaving(false);
+      // Rollback: reîncarcă lista de proiecte
+      if (onResponsabilAdded) {
+        onResponsabilAdded();
+      }
     }
   };
 

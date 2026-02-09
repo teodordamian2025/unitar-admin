@@ -756,7 +756,29 @@ export default function UserProjectsTable({ searchParams }: UserProjectsTablePro
                           <AddResponsabilButton
                             entityType="proiect"
                             entityId={project.ID_Proiect}
-                            onResponsabilAdded={loadProjects}
+                            onResponsabilAdded={(addedUser) => {
+                              if (addedUser) {
+                                // Optimistic: update local state imediat
+                                setProjects(prev => prev.map(p =>
+                                  p.ID_Proiect === project.ID_Proiect
+                                    ? {
+                                        ...p,
+                                        responsabili_toti: [
+                                          ...(p.responsabili_toti || []),
+                                          {
+                                            responsabil_uid: addedUser.uid,
+                                            responsabil_nume: addedUser.nume_complet,
+                                            rol_in_proiect: addedUser.rol as 'Principal' | 'Normal' | 'Observator'
+                                          }
+                                        ]
+                                      }
+                                    : p
+                                ));
+                              } else {
+                                // Rollback: reîncarcă
+                                loadProjects();
+                              }
+                            }}
                             existingResponsabili={
                               project.responsabili_toti?.map(r => ({
                                 uid: r.responsabil_uid,
@@ -1130,7 +1152,29 @@ export default function UserProjectsTable({ searchParams }: UserProjectsTablePro
                           <AddResponsabilButton
                             entityType="subproiect"
                             entityId={subproject.ID_Subproiect}
-                            onResponsabilAdded={loadProjects}
+                            onResponsabilAdded={(addedUser) => {
+                              if (addedUser) {
+                                // Optimistic: update local state imediat
+                                setSubprojects(prev => prev.map(s =>
+                                  s.ID_Subproiect === subproject.ID_Subproiect
+                                    ? {
+                                        ...s,
+                                        responsabili_toti: [
+                                          ...(s.responsabili_toti || []),
+                                          {
+                                            responsabil_uid: addedUser.uid,
+                                            responsabil_nume: addedUser.nume_complet,
+                                            rol_in_proiect: addedUser.rol as 'Principal' | 'Normal' | 'Observator'
+                                          }
+                                        ]
+                                      }
+                                    : s
+                                ));
+                              } else {
+                                // Rollback: reîncarcă
+                                loadProjects();
+                              }
+                            }}
                             existingResponsabili={
                               subproject.responsabili_toti?.map(r => ({
                                 uid: r.responsabil_uid,
