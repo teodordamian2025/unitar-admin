@@ -26,6 +26,30 @@ const DATASET = 'PanouControlUnitar';
 
 // ✅ Toggle pentru tabele optimizate cu partitioning + clustering
 const useV2Tables = process.env.BIGQUERY_USE_V2_TABLES === 'true';
+
+// Escapare caractere speciale XML (&, <, >, ", ') pentru a preveni coruperea DOCX
+function escapeXml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+// Escapare recursivă a tuturor string-urilor dintr-un obiect de date (pentru template DOCX)
+function escapeDataForXml(data: any): any {
+  if (typeof data === 'string') return escapeXml(data);
+  if (Array.isArray(data)) return data.map(item => escapeDataForXml(item));
+  if (data && typeof data === 'object') {
+    const result: any = {};
+    for (const [key, value] of Object.entries(data)) {
+      result[key] = escapeDataForXml(value);
+    }
+    return result;
+  }
+  return data;
+}
 const tableSuffix = useV2Tables ? '_v2' : '';
 
 // ✅ Tabele cu suffix dinamic
@@ -615,7 +639,7 @@ function convertTextToWordXml(text: string): string {
       let processedLine = cleanLine;
 
       processedLine = processedLine.replace(/\*\*(.*?)\*\*/g, (match, content) => {
-        return `<w:r><w:rPr><w:b/><w:sz w:val="24"/></w:rPr><w:t xml:space="preserve">${content}</w:t></w:r>`;
+        return `<w:r><w:rPr><w:b/><w:sz w:val="24"/></w:rPr><w:t xml:space="preserve">${escapeXml(content)}</w:t></w:r>`;
       });
 
       const boldPattern = /<w:r><w:rPr><w:b\/><w:sz w:val="24"\/><\/w:rPr><w:t xml:space="preserve">.*?<\/w:t><\/w:r>/g;
@@ -625,7 +649,7 @@ function convertTextToWordXml(text: string): string {
       let result = '';
       for (let i = 0; i < parts.length; i++) {
         if (parts[i].trim() || parts[i].includes(' ')) {
-          result += `<w:r><w:t xml:space="preserve">${parts[i]}</w:t></w:r>`;
+          result += `<w:r><w:t xml:space="preserve">${escapeXml(parts[i])}</w:t></w:r>`;
         }
         if (boldMatches[i]) {
           result += boldMatches[i];
@@ -635,7 +659,7 @@ function convertTextToWordXml(text: string): string {
       return `<w:p><w:pPr>${alignment}<w:spacing w:after="120" w:line="240" w:lineRule="auto"/></w:pPr>${result}</w:p>`;
     }
 
-    return `<w:p><w:pPr>${alignment}<w:spacing w:after="120" w:line="240" w:lineRule="auto"/></w:pPr><w:r><w:t xml:space="preserve">${cleanLine}</w:t></w:r></w:p>`;
+    return `<w:p><w:pPr>${alignment}<w:spacing w:after="120" w:line="240" w:lineRule="auto"/></w:pPr><w:r><w:t xml:space="preserve">${escapeXml(cleanLine)}</w:t></w:r></w:p>`;
   }).join('');
 
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -718,12 +742,13 @@ async function processPVDocxTemplate(templatePath: string, data: any): Promise<B
       throw new Error('document.xml nu a fost gasit in template DOCX PV');
     }
     
-    const processedXml = processPVPlaceholders(documentXml, data);
-    
+    // Escapare date pentru XML - previne coruperea DOCX cu caractere speciale (&, <, >)
+    const processedXml = processPVPlaceholders(documentXml, escapeDataForXml(data));
+
     zip.file('word/document.xml', processedXml);
-    
+
     return await zip.generateAsync({ type: 'nodebuffer' });
-    
+
   } catch (error) {
     console.error('Eroare la procesarea template-ului DOCX PV:', error);
     throw error;
