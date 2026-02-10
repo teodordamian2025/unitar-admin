@@ -19,6 +19,7 @@ interface CommentsCardProps {
   proiectDenumire?: string;
   maxComments?: number;
   showAddButton?: boolean;
+  onOpenAllComments?: () => void;
 }
 
 interface Comentariu {
@@ -46,7 +47,8 @@ function CommentsCardComponent({
   tipProiect = 'proiect',
   proiectDenumire = '',
   maxComments = 5,
-  showAddButton = true
+  showAddButton = true,
+  onOpenAllComments
 }: CommentsCardProps) {
   const [firebaseUser] = useAuthState(auth);
   const [comentarii, setComentarii] = useState<Comentariu[]>([]);
@@ -280,7 +282,7 @@ function CommentsCardComponent({
           Nu există comentarii
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '400px', overflowY: 'auto' }}>
           {displayedComments.map((comentariu) => (
             <div
               key={comentariu.id}
@@ -322,22 +324,26 @@ function CommentsCardComponent({
                 lineHeight: '1.5',
                 whiteSpace: 'pre-wrap'
               }}>
-                {comentariu.comentariu.length > 150
-                  ? `${comentariu.comentariu.substring(0, 150)}...`
-                  : comentariu.comentariu}
+                {comentariu.comentariu}
               </p>
             </div>
           ))}
 
-          {hasMoreComments && (
+          {hasMoreComments && onOpenAllComments && (
             <div style={{ textAlign: 'center', marginTop: '0.5rem' }}>
-              <span style={{
-                fontSize: '0.8rem',
-                color: '#3b82f6',
-                cursor: 'pointer'
-              }}>
-                + {comentarii.length - maxComments} comentarii
-              </span>
+              <button
+                onClick={onOpenAllComments}
+                style={{
+                  fontSize: '0.8rem',
+                  color: '#3b82f6',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '0.5rem'
+                }}
+              >
+                + Vezi toate comentariile ({comentarii.length - maxComments} în plus)
+              </button>
             </div>
           )}
         </div>

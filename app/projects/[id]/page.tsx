@@ -94,6 +94,7 @@ export default function UserProiectDetailsPage() {
   const [error, setError] = useState<string | null>(null);
   const [showSarciniModal, setShowSarciniModal] = useState(false);
   const [selectedProiectForSarcini, setSelectedProiectForSarcini] = useState<ProiectDetails | null>(null);
+  const [sarciniModalDefaultTab, setSarciniModalDefaultTab] = useState<'sarcini' | 'comentarii' | 'timetracking'>('sarcini');
   const [showPVModal, setShowPVModal] = useState(false); // NOU: State pentru Proces Verbal modal
 
   // NOU: State pentru debouncing progres și status predare (04.10.2025)
@@ -424,6 +425,7 @@ export default function UserProiectDetailsPage() {
 
   const handleOpenSarcini = (proiectData: ProiectDetails) => {
     setSelectedProiectForSarcini(proiectData);
+    setSarciniModalDefaultTab('sarcini');
     setShowSarciniModal(true);
   };
 
@@ -1770,6 +1772,13 @@ export default function UserProiectDetailsPage() {
             proiectDenumire={proiect.Denumire}
             maxComments={5}
             showAddButton={true}
+            onOpenAllComments={() => {
+              if (proiect) {
+                setSelectedProiectForSarcini(proiect);
+                setSarciniModalDefaultTab('comentarii');
+                setShowSarciniModal(true);
+              }
+            }}
           />
 
           {/* Card Sarcini */}
@@ -1800,8 +1809,10 @@ export default function UserProiectDetailsPage() {
           onClose={() => {
             setShowSarciniModal(false);
             setSelectedProiectForSarcini(null);
+            setSarciniModalDefaultTab('sarcini');
           }}
           proiect={selectedProiectForSarcini}
+          defaultTab={sarciniModalDefaultTab}
         />
       )}
 

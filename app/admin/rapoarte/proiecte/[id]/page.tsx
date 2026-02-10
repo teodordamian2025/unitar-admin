@@ -20,6 +20,7 @@ import ProiectEditModal from '../components/ProiectEditModal';
 import CommentsCard from '../components/CommentsCard';
 import TasksCard from '../components/TasksCard';
 import ResponsabiliCard from '../components/ResponsabiliCard';
+import SarciniProiectModal from '../components/SarciniProiectModal';
 import DateEditButton from '../components/DateEditButton';
 import FinancialStatsCard from '../components/FinancialStatsCard';
 import SendEmailClientModal from '../components/SendEmailClientModal';
@@ -139,6 +140,7 @@ export default function ProiectDetailsPage() {
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [showProgressModal, setShowProgressModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showComentariiModal, setShowComentariiModal] = useState(false);
 
   useEffect(() => {
     if (loadingAuth) return;
@@ -1818,6 +1820,7 @@ export default function ProiectDetailsPage() {
           proiectDenumire={proiect.Denumire}
           maxComments={5}
           showAddButton={true}
+          onOpenAllComments={() => setShowComentariiModal(true)}
         />
 
         {/* NOU 12.01.2026: Card Sarcini */}
@@ -1845,6 +1848,22 @@ export default function ProiectDetailsPage() {
           onRefresh={() => fetchProiectDetails()}
         />
       </div>
+
+      {/* COMENTARII MODAL - Deschide tab-ul comentarii din SarciniProiectModal */}
+      {showComentariiModal && proiect && (
+        <SarciniProiectModal
+          isOpen={showComentariiModal}
+          onClose={() => setShowComentariiModal(false)}
+          proiect={{
+            ID_Proiect: proiect.ID_Proiect,
+            Denumire: proiect.Denumire,
+            Client: proiect.Client,
+            Status: proiect.Status,
+            tip: 'proiect'
+          }}
+          defaultTab="comentarii"
+        />
+      )}
 
       {/* CONTRACT MODAL */}
       {showContractModal && proiect && (
