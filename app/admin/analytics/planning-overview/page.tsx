@@ -523,37 +523,50 @@ export default function PlanningOverviewPage() {
   };
 
   // Funcție pentru verificarea existenței înregistrărilor de timp pentru alocări
+  // OPTIMIZAT: 1 singur API call batch în loc de N apeluri secvențiale
   const checkExistingTimeEntries = useCallback(async (planificari: Planificare[], userId: string, date: string) => {
     if (!planificari.length) return;
 
     try {
-      const existingMap: Record<string, boolean> = {};
+      // Colectăm toate proiect_ids unice și mapăm la alocare_ids
+      const proiectIdMap: Record<string, string[]> = {};
 
       for (const p of planificari) {
-        // Construiește identificatorul unic pentru verificare
         const proiectId = p.proiect_id || p.sarcina_proiect_id || p.parent_proiect_id;
-        if (!proiectId && !p.subproiect_id && !p.sarcina_id) continue;
+        if (!proiectId) continue;
 
-        // Verifică dacă există înregistrare pentru această combinație
-        const params = new URLSearchParams({
-          utilizator_uid: userId,
-          data_lucru: date
-        });
-
-        if (proiectId) {
-          params.append('proiect_id', proiectId);
+        if (!proiectIdMap[proiectId]) {
+          proiectIdMap[proiectId] = [];
         }
-
-        const response = await fetch(`/api/rapoarte/timetracking?${params}&limit=100`);
-        const result = await response.json();
-
-        if (result.success && result.data && result.data.length > 0) {
-          // Marchează această alocare ca având înregistrare existentă
-          existingMap[p.id] = true;
-        }
+        proiectIdMap[proiectId].push(p.id);
       }
 
-      setExistingTimeEntries(existingMap);
+      const uniqueProiectIds = Object.keys(proiectIdMap);
+      if (uniqueProiectIds.length === 0) return;
+
+      // Un singur API call cu batch_proiect_ids
+      const params = new URLSearchParams({
+        utilizator_uid: userId,
+        data_lucru: date,
+        batch_proiect_ids: uniqueProiectIds.join(',')
+      });
+
+      const response = await fetch(`/api/rapoarte/timetracking?${params}`);
+      const result = await response.json();
+
+      if (result.success && result.existing_proiect_ids) {
+        const existingMap: Record<string, boolean> = {};
+        const existingProiectIds = new Set(result.existing_proiect_ids);
+
+        // Mapăm înapoi de la proiect_id la alocare_id
+        for (const [proiectId, alocareIds] of Object.entries(proiectIdMap)) {
+          if (existingProiectIds.has(proiectId)) {
+            alocareIds.forEach(id => { existingMap[id] = true; });
+          }
+        }
+
+        setExistingTimeEntries(existingMap);
+      }
     } catch (error) {
       console.error('Eroare la verificarea înregistrărilor existente:', error);
     }
@@ -571,125 +584,140 @@ export default function PlanningOverviewPage() {
   }, [selectedCell, checkExistingTimeEntries]);
 
   // Funcție pentru înregistrarea timpului pentru alocările selectate
+  // OPTIMISTIC UI: Actualizăm UI-ul instant, API calls în background
   const registerTimeForAllocations = async () => {
     if (!selectedCell || selectedAlocariForTime.size === 0) {
       toast.error('Selectați cel puțin o alocare pentru înregistrare');
       return;
     }
 
-    setTimeRegistrationLoading(true);
+    // 1. Validare + colectare date ÎNAINTE de update optimist
+    const alocariToRegister: Array<{alocareId: string, alocare: any, ore: number, observatii: string}> = [];
+    const validationErrors: string[] = [];
 
-    try {
-      const errors: string[] = [];
-      const successfulIds: string[] = [];
+    for (const alocareId of Array.from(selectedAlocariForTime)) {
+      const alocare = selectedCell.planificari.find(p => p.id === alocareId);
+      if (!alocare) continue;
 
-      for (const alocareId of Array.from(selectedAlocariForTime)) {
-        const alocare = selectedCell.planificari.find(p => p.id === alocareId);
-        if (!alocare) continue;
-
-        // Verifică ore
-        const ore = orePerAlocare[alocareId] || alocare.ore_planificate;
-        if (!ore || ore <= 0) {
-          errors.push(`Orele pentru "${alocare.proiect_denumire || alocare.sarcina_titlu || alocareId}" sunt invalide`);
-          continue;
-        }
-
-        // Verifică observații (obligatorii dacă există deja înregistrare)
-        const observatii = observatiiPerAlocare[alocareId] || '';
-        if (existingTimeEntries[alocareId] && !observatii.trim()) {
-          errors.push(`Observațiile sunt obligatorii pentru "${alocare.proiect_denumire || alocare.sarcina_titlu}" (există deja înregistrare pentru acest proiect)`);
-          continue;
-        }
-
-        // Determină proiect_id și subproiect_id
-        let proiect_id = alocare.proiect_id || null;
-        let subproiect_id = alocare.subproiect_id || null;
-        let sarcina_id = alocare.sarcina_id || null;
-
-        // Pentru sarcini, folosim proiectul părinte
-        if (sarcina_id && alocare.sarcina_proiect_id) {
-          proiect_id = alocare.sarcina_proiect_id;
-        }
-
-        // Construiește descrierea
-        let descriere = observatii.trim();
-        if (!descriere) {
-          descriere = `Lucrat conform planificării: ${alocare.proiect_denumire || ''}${alocare.subproiect_denumire ? ' / ' + alocare.subproiect_denumire : ''}${alocare.sarcina_titlu ? ' / ' + alocare.sarcina_titlu : ''}`.trim();
-        }
-
-        const timeData = {
-          id: `TIME_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
-          sarcina_id: sarcina_id,
-          utilizator_uid: selectedCell.uid, // UID-ul utilizatorului din alocare
-          utilizator_nume: selectedCell.nume, // Numele utilizatorului din alocare
-          data_lucru: selectedCell.data,
-          ore_lucrate: ore,
-          descriere_lucru: descriere,
-          tip_inregistrare: 'manual',
-          proiect_id: proiect_id,
-          subproiect_id: subproiect_id
-        };
-
-        try {
-          const response = await fetch('/api/rapoarte/timetracking', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(timeData)
-          });
-
-          const result = await response.json();
-
-          if (result.success) {
-            successfulIds.push(alocareId);
-          } else {
-            errors.push(`Eroare pentru "${alocare.proiect_denumire || alocare.sarcina_titlu}": ${result.error}`);
-          }
-        } catch (err) {
-          errors.push(`Eroare la înregistrare pentru "${alocare.proiect_denumire || alocare.sarcina_titlu}"`);
-        }
+      const ore = orePerAlocare[alocareId] || alocare.ore_planificate;
+      if (!ore || ore <= 0) {
+        validationErrors.push(`Orele pentru "${alocare.proiect_denumire || alocare.sarcina_titlu || alocareId}" sunt invalide`);
+        continue;
       }
 
-      // Actualizează starea cu înregistrările reușite
-      if (successfulIds.length > 0) {
-        setRegisteredAlocariIds(prev => {
-          const newSet = new Set(prev);
-          successfulIds.forEach(id => newSet.add(id));
-          return newSet;
-        });
-
-        // Șterge din selecție
-        setSelectedAlocariForTime(prev => {
-          const newSet = new Set(prev);
-          successfulIds.forEach(id => newSet.delete(id));
-          return newSet;
-        });
-
-        // Marchează ca având înregistrări existente
-        setExistingTimeEntries(prev => {
-          const newMap = { ...prev };
-          successfulIds.forEach(id => {
-            newMap[id] = true;
-          });
-          return newMap;
-        });
-
-        toast.success(`${successfulIds.length} înregistrare/i de timp salvate cu succes!`);
+      const observatii = observatiiPerAlocare[alocareId] || '';
+      if (existingTimeEntries[alocareId] && !observatii.trim()) {
+        validationErrors.push(`Observațiile sunt obligatorii pentru "${alocare.proiect_denumire || alocare.sarcina_titlu}" (există deja înregistrare pentru acest proiect)`);
+        continue;
       }
 
-      if (errors.length > 0) {
-        errors.forEach(err => toast.error(err));
+      alocariToRegister.push({ alocareId, alocare, ore, observatii });
+    }
+
+    if (validationErrors.length > 0) {
+      validationErrors.forEach(err => toast.error(err));
+      if (alocariToRegister.length === 0) return;
+    }
+
+    // 2. OPTIMISTIC UPDATE - actualizăm UI-ul instant
+    const alocareIdsToRegister = alocariToRegister.map(a => a.alocareId);
+    const previousRegisteredIds = new Set(registeredAlocariIds);
+    const previousExistingEntries = { ...existingTimeEntries };
+
+    setRegisteredAlocariIds(prev => {
+      const newSet = new Set(prev);
+      alocareIdsToRegister.forEach(id => newSet.add(id));
+      return newSet;
+    });
+
+    setSelectedAlocariForTime(prev => {
+      const newSet = new Set(prev);
+      alocareIdsToRegister.forEach(id => newSet.delete(id));
+      return newSet;
+    });
+
+    setExistingTimeEntries(prev => {
+      const newMap = { ...prev };
+      alocareIdsToRegister.forEach(id => { newMap[id] = true; });
+      return newMap;
+    });
+
+    toast.success(`${alocariToRegister.length} ${alocariToRegister.length === 1 ? 'înregistrare salvată' : 'înregistrări salvate'} cu succes!`);
+
+    // 3. API calls în background (fără a bloca UI-ul)
+    const failedIds: string[] = [];
+    const errors: string[] = [];
+
+    for (const { alocareId, alocare, ore, observatii } of alocariToRegister) {
+      let proiect_id = alocare.proiect_id || null;
+      let subproiect_id = alocare.subproiect_id || null;
+      let sarcina_id = alocare.sarcina_id || null;
+
+      if (sarcina_id && alocare.sarcina_proiect_id) {
+        proiect_id = alocare.sarcina_proiect_id;
       }
 
-    } catch (error) {
-      console.error('Eroare la înregistrarea timpului:', error);
-      toast.error('Eroare la înregistrarea timpului');
-    } finally {
-      setTimeRegistrationLoading(false);
+      let descriere = observatii.trim();
+      if (!descriere) {
+        descriere = `Lucrat conform planificării: ${alocare.proiect_denumire || ''}${alocare.subproiect_denumire ? ' / ' + alocare.subproiect_denumire : ''}${alocare.sarcina_titlu ? ' / ' + alocare.sarcina_titlu : ''}`.trim();
+      }
+
+      const timeData = {
+        id: `TIME_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+        sarcina_id: sarcina_id,
+        utilizator_uid: selectedCell.uid,
+        utilizator_nume: selectedCell.nume,
+        data_lucru: selectedCell.data,
+        ore_lucrate: ore,
+        descriere_lucru: descriere,
+        tip_inregistrare: 'manual',
+        proiect_id: proiect_id,
+        subproiect_id: subproiect_id
+      };
+
+      try {
+        const response = await fetch('/api/rapoarte/timetracking', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(timeData)
+        });
+
+        const result = await response.json();
+
+        if (!result.success) {
+          failedIds.push(alocareId);
+          errors.push(`Eroare pentru "${alocare.proiect_denumire || alocare.sarcina_titlu}": ${result.error}`);
+        }
+      } catch (err) {
+        failedIds.push(alocareId);
+        errors.push(`Eroare la înregistrare pentru "${alocare.proiect_denumire || alocare.sarcina_titlu}"`);
+      }
+    }
+
+    // 4. ROLLBACK dacă au fost erori
+    if (failedIds.length > 0) {
+      setRegisteredAlocariIds(prev => {
+        const newSet = new Set(prev);
+        failedIds.forEach(id => {
+          if (!previousRegisteredIds.has(id)) newSet.delete(id);
+        });
+        return newSet;
+      });
+
+      setExistingTimeEntries(prev => {
+        const newMap = { ...prev };
+        failedIds.forEach(id => {
+          if (!previousExistingEntries[id]) delete newMap[id];
+        });
+        return newMap;
+      });
+
+      errors.forEach(err => toast.error(err));
     }
   };
 
   // Verifică dacă butonul de înregistrare timp trebuie să fie activ
-  const canRegisterTime = selectedAlocariForTime.size > 0 && !timeRegistrationLoading;
+  const canRegisterTime = selectedAlocariForTime.size > 0;
 
   // Funcții pentru navigare săptămână
   const goToPreviousWeek = () => {

@@ -86,6 +86,63 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    // BATCH CHECK: Verificare existență înregistrări pentru multiple proiecte simultan (1 query în loc de N)
+    const batchProiectIds = searchParams.get('batch_proiect_ids');
+    if (batchProiectIds && utilizatorUid && dataLucru) {
+      const proiectIds = batchProiectIds.split(',').filter(id => id.trim());
+      if (proiectIds.length === 0) {
+        return NextResponse.json({ success: true, existing_proiect_ids: [] });
+      }
+
+      const SUBPROIECTE_TABLE_BATCH = `\`${PROJECT_ID}.${DATASET}.Subproiecte${tableSuffix}\``;
+
+      const batchQuery = `
+        SELECT DISTINCT
+          COALESCE(
+            tt.proiect_id,
+            sp.ID_Proiect,
+            CASE WHEN s.tip_proiect = 'proiect' THEN s.proiect_id ELSE NULL END,
+            CASE WHEN s.tip_proiect = 'subproiect' THEN sp_sarcina.ID_Proiect ELSE NULL END
+          ) as matched_proiect_id
+        FROM ${TIMETRACKING_TABLE} tt
+        LEFT JOIN ${SARCINI_TABLE} s ON tt.sarcina_id = s.id
+        LEFT JOIN ${SUBPROIECTE_TABLE_BATCH} sp ON tt.subproiect_id = sp.ID_Subproiect
+        LEFT JOIN ${SUBPROIECTE_TABLE_BATCH} sp_sarcina ON s.tip_proiect = 'subproiect' AND s.proiect_id = sp_sarcina.ID_Subproiect
+        WHERE tt.utilizator_uid = @utilizatorUid
+        AND tt.data_lucru = @dataLucru
+        AND (
+          tt.proiect_id IN UNNEST(@proiectIds)
+          OR sp.ID_Proiect IN UNNEST(@proiectIds)
+          OR (s.tip_proiect = 'proiect' AND s.proiect_id IN UNNEST(@proiectIds))
+          OR (s.tip_proiect = 'subproiect' AND sp_sarcina.ID_Proiect IN UNNEST(@proiectIds))
+        )
+      `;
+
+      const [rows] = await bigquery.query({
+        query: batchQuery,
+        params: {
+          utilizatorUid,
+          dataLucru,
+          proiectIds
+        },
+        types: {
+          utilizatorUid: 'STRING',
+          dataLucru: 'DATE',
+          proiectIds: ['STRING']
+        },
+        location: 'EU',
+      });
+
+      const existingIds = rows
+        .map((r: any) => r.matched_proiect_id)
+        .filter((id: string | null) => id !== null);
+
+      return NextResponse.json({
+        success: true,
+        existing_proiect_ids: existingIds
+      });
+    }
+
     // ACTUALIZAT: Query pentru înregistrări time tracking cu detalii sarcină + proiect_id + subproiect_id
     // FIX 19.01.2026: Adăugat JOIN-uri cu Subproiecte pentru filtrare corectă pe proiect
     const SUBPROIECTE_TABLE = `\`${PROJECT_ID}.${DATASET}.Subproiecte${tableSuffix}\``;
