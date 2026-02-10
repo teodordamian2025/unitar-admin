@@ -24,6 +24,7 @@ import SarciniProiectModal from '../components/SarciniProiectModal';
 import DateEditButton from '../components/DateEditButton';
 import FinancialStatsCard from '../components/FinancialStatsCard';
 import SendEmailClientModal from '../components/SendEmailClientModal';
+import ClientEditModal from '@/app/admin/rapoarte/clienti/components/ClientEditModal';
 import { useDebounce } from '@/app/hooks/useDebounce';
 
 interface ProiectDetails {
@@ -141,6 +142,9 @@ export default function ProiectDetailsPage() {
   const [showProgressModal, setShowProgressModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showComentariiModal, setShowComentariiModal] = useState(false);
+  const [showClientEditModal, setShowClientEditModal] = useState(false);
+  const [clientForEdit, setClientForEdit] = useState<any>(null);
+  const [loadingClient, setLoadingClient] = useState(false);
 
   useEffect(() => {
     if (loadingAuth) return;
@@ -442,6 +446,40 @@ export default function ProiectDetailsPage() {
     setShowEditModal(false);
     // Navigare înapoi la lista de proiecte
     router.push('/admin/rapoarte/proiecte');
+  };
+
+  // Handler pentru deschiderea modalului de editare client
+  const handleOpenClientEdit = async () => {
+    if (!proiect?.client_id) {
+      toast.warn('Acest proiect nu are un client asociat cu ID.');
+      return;
+    }
+
+    setLoadingClient(true);
+    try {
+      const response = await fetch(`/api/rapoarte/clienti?id=${encodeURIComponent(proiect.client_id)}`);
+      const data = await response.json();
+
+      if (data.success && data.data && data.data.length > 0) {
+        setClientForEdit(data.data[0]);
+        setShowClientEditModal(true);
+      } else {
+        toast.error('Clientul nu a fost găsit în baza de date.');
+      }
+    } catch (error) {
+      console.error('Eroare la încărcarea datelor clientului:', error);
+      toast.error('Eroare la încărcarea datelor clientului.');
+    } finally {
+      setLoadingClient(false);
+    }
+  };
+
+  // Handler pentru actualizarea clientului din modal
+  const handleClientUpdated = () => {
+    setShowClientEditModal(false);
+    setClientForEdit(null);
+    // Refresh datele proiectului (numele clientului poate fi schimbat)
+    fetchProiectDetails();
   };
 
   // NOU: Handler pentru actualizare status subproiect (04.10.2025)
@@ -865,7 +903,32 @@ export default function ProiectDetailsPage() {
               <label style={{ display: 'block', fontWeight: 500, color: '#495057', marginBottom: '0.25rem' }}>
                 Client
               </label>
-              <div style={{ color: '#6c757d' }}>{proiect.Client}</div>
+              <div style={{ color: '#6c757d', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span>{proiect.Client}</span>
+                {proiect.client_id && (
+                  <button
+                    onClick={handleOpenClientEdit}
+                    disabled={loadingClient}
+                    title="Editare client (contacte email, date)"
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: loadingClient ? 'wait' : 'pointer',
+                      padding: '2px 4px',
+                      borderRadius: '4px',
+                      fontSize: '14px',
+                      opacity: loadingClient ? 0.5 : 0.6,
+                      transition: 'opacity 0.2s',
+                      display: 'inline-flex',
+                      alignItems: 'center'
+                    }}
+                    onMouseEnter={(e) => { if (!loadingClient) (e.target as HTMLElement).style.opacity = '1'; }}
+                    onMouseLeave={(e) => { if (!loadingClient) (e.target as HTMLElement).style.opacity = '0.6'; }}
+                  >
+                    {loadingClient ? '⏳' : '✏️'}
+                  </button>
+                )}
+              </div>
             </div>
             
             <div>
@@ -2140,6 +2203,19 @@ export default function ProiectDetailsPage() {
           onClose={() => setShowEditModal(false)}
           onProiectUpdated={handleProiectUpdated}
           onProiectDeleted={handleProiectDeleted}
+        />
+      )}
+
+      {/* CLIENT EDIT MODAL */}
+      {showClientEditModal && clientForEdit && (
+        <ClientEditModal
+          isOpen={showClientEditModal}
+          onClose={() => {
+            setShowClientEditModal(false);
+            setClientForEdit(null);
+          }}
+          onClientUpdated={handleClientUpdated}
+          client={clientForEdit}
         />
       )}
       </div>

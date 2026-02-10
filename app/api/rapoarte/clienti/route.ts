@@ -41,6 +41,13 @@ export async function GET(request: NextRequest) {
     const conditions: string[] = [];
     const params: any = {};
 
+    // Filtru direct pe ID (pentru fetch client individual)
+    const clientId = searchParams.get('id');
+    if (clientId) {
+      conditions.push('id = @clientId');
+      params.clientId = clientId;
+    }
+
     // Filtre
     const search = searchParams.get('search');
     if (search) {
