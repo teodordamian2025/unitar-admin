@@ -13,6 +13,11 @@
 //                         + verificare case-insensitive pentru status factură + exclude_notificari_plata
 // MODIFICAT: 03.02.2026 - FIX: Adăugat exclude_notificari_plata și pentru secțiunea "facturi netrimise ANAF"
 //                         (lipsea verificarea - se trimiteau notificări chiar dacă factura era marcată pentru excludere)
+// MODIFICAT: 12.02.2026 - FIX CRITICAL: Verificare permisivă încasări - folosește GREATEST în loc de COALESCE
+//                         pentru a lua maximul din TOATE sursele de plată (EtapeFacturi, Chitante, TranzactiiBancare, fg.valoare_platita)
+//                         Bug: COALESCE(0, fg.valoare_platita, 0) returna 0 când EtapeFacturi/Chitante avea valoare 0 (nu NULL)
+//                         + Adăugat AnexeContract_v2 ca sursă de status încasare
+//                         + Adăugat TranzactiiBancare_v2 matched ca sursă de sumă plătită
 
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
@@ -45,6 +50,9 @@ const TABLE_ANAF_EFACTURA = `\`${PROJECT_ID}.${DATASET}.AnafEFactura${tableSuffi
 const TABLE_ETAPE_FACTURI = `\`${PROJECT_ID}.${DATASET}.EtapeFacturi${tableSuffix}\``;
 // ✅ FIX 26.01.2026: Adăugat tabel Chitante pentru verificare completă a încasărilor
 const TABLE_CHITANTE = `\`${PROJECT_ID}.${DATASET}.Chitante${tableSuffix}\``;
+// ✅ FIX 12.02.2026: Adăugat tabele suplimentare pentru verificare permisivă a încasărilor
+const TABLE_TRANZACTII_BANCARE = `\`${PROJECT_ID}.${DATASET}.TranzactiiBancare${tableSuffix}\``;
+const TABLE_ANEXE_CONTRACT = `\`${PROJECT_ID}.${DATASET}.AnexeContract${tableSuffix}\``;
 
 const bigquery = new BigQuery({
   projectId: PROJECT_ID,
@@ -1117,50 +1125,35 @@ export async function GET(request: NextRequest) {
 
     const facturiScadentaApropiataQuery = `
       WITH incasari_etape AS (
-        -- ✅ FIX 24.01.2026: Agregăm încasările din EtapeFacturi pentru fiecare factură
-        SELECT
-          factura_id,
-          SUM(COALESCE(valoare_incasata, 0)) as total_incasat
+        SELECT factura_id, SUM(COALESCE(valoare_incasata, 0)) as total_incasat
         FROM ${TABLE_ETAPE_FACTURI}
         WHERE activ = true AND factura_id IS NOT NULL
         GROUP BY factura_id
       ),
       incasari_chitante AS (
-        -- ✅ FIX 26.01.2026: Agregăm încasările din Chitante (alternativă la EtapeFacturi)
-        SELECT
-          factura_id,
-          SUM(COALESCE(valoare_incasata, 0)) as total_incasat
+        SELECT factura_id, SUM(COALESCE(valoare_incasata, 0)) as total_incasat
         FROM ${TABLE_CHITANTE}
         WHERE activ = true AND COALESCE(anulata, false) = false AND factura_id IS NOT NULL
         GROUP BY factura_id
       ),
-      incasari_combinate AS (
-        -- Combinăm încasările din ambele surse
-        SELECT
-          factura_id,
-          total_incasat
-        FROM incasari_etape
-        UNION ALL
-        SELECT
-          factura_id,
-          total_incasat
-        FROM incasari_chitante
+      -- ✅ FIX 12.02.2026: Adăugat tranzacții bancare matched ca sursă suplimentară de plată
+      incasari_tranzactii AS (
+        SELECT matched_factura_id as factura_id, SUM(ABS(suma)) as total_incasat
+        FROM ${TABLE_TRANZACTII_BANCARE}
+        WHERE matched_factura_id IS NOT NULL
+          AND LOWER(COALESCE(status, '')) = 'matched'
+          AND LOWER(COALESCE(directie, '')) = 'intrare'
+        GROUP BY matched_factura_id
       ),
-      incasari_facturi AS (
-        -- Suma totală din toate sursele
-        SELECT
-          factura_id,
-          SUM(total_incasat) as total_incasat
-        FROM incasari_combinate
-        GROUP BY factura_id
-      ),
-      -- ✅ FIX 28.01.2026: CTE pentru facturile marcate ca încasate direct în EtapeFacturi (status_incasare = 'Incasat')
-      facturi_incasate_ef AS (
+      -- ✅ FIX 12.02.2026: CTE pentru facturile marcate ca încasate în EtapeFacturi SAU AnexeContract
+      facturi_incasate_status AS (
         SELECT DISTINCT factura_id
         FROM ${TABLE_ETAPE_FACTURI}
-        WHERE activ = true
-          AND factura_id IS NOT NULL
-          AND LOWER(status_incasare) = 'incasat'
+        WHERE activ = true AND factura_id IS NOT NULL AND LOWER(status_incasare) = 'incasat'
+        UNION DISTINCT
+        SELECT DISTINCT factura_id
+        FROM ${TABLE_ANEXE_CONTRACT}
+        WHERE activ = true AND factura_id IS NOT NULL AND LOWER(status_incasare) = 'incasat'
       )
       SELECT
         fg.id,
@@ -1171,29 +1164,43 @@ export async function GET(request: NextRequest) {
         fg.client_nume,
         fg.client_cui,
         fg.total,
-        -- ✅ FIX 24.01.2026 + 26.01.2026: Folosim încasările din EtapeFacturi+Chitante (prioritar) sau din FacturiGenerate (fallback)
-        COALESCE(ef.total_incasat, fg.valoare_platita, 0) as valoare_platita,
+        -- ✅ FIX 12.02.2026: GREATEST ia maximul din TOATE sursele de plată (rezolvă bug COALESCE cu 0 vs NULL)
+        GREATEST(
+          COALESCE(ie.total_incasat, 0),
+          COALESCE(ic.total_incasat, 0),
+          COALESCE(it.total_incasat, 0),
+          COALESCE(fg.valoare_platita, 0)
+        ) as valoare_platita,
         fg.proiect_id,
-        -- ✅ FIX 26.01.2026: Adăugăm ID-ul proiectului din Proiecte pentru afișare în notificări
         p.ID_Proiect as proiect_id_display,
         p.Denumire as proiect_denumire,
-        (fg.total - COALESCE(ef.total_incasat, fg.valoare_platita, 0)) as rest_de_plata,
+        (fg.total - GREATEST(
+          COALESCE(ie.total_incasat, 0),
+          COALESCE(ic.total_incasat, 0),
+          COALESCE(it.total_incasat, 0),
+          COALESCE(fg.valoare_platita, 0)
+        )) as rest_de_plata,
         DATE_DIFF(fg.data_scadenta, CURRENT_DATE(), DAY) as zile_pana_scadenta
       FROM ${TABLE_FACTURI_GENERATE} fg
-      LEFT JOIN incasari_facturi ef ON fg.id = ef.factura_id
+      LEFT JOIN incasari_etape ie ON fg.id = ie.factura_id
+      LEFT JOIN incasari_chitante ic ON fg.id = ic.factura_id
+      LEFT JOIN incasari_tranzactii it ON fg.id = it.factura_id
       LEFT JOIN ${TABLE_PROIECTE} p ON fg.proiect_id = p.ID_Proiect
       WHERE fg.data_scadenta IS NOT NULL
         AND fg.data_scadenta BETWEEN CURRENT_DATE() AND DATE_ADD(CURRENT_DATE(), INTERVAL ${zileAvans} DAY)
-        -- ✅ FIX 24.01.2026 + 26.01.2026: Verificăm restul de plată folosind toate sursele de încasare
-        AND (fg.total - COALESCE(ef.total_incasat, fg.valoare_platita, 0)) > 0
+        -- ✅ FIX 12.02.2026: Verificare permisivă - dacă ORICARE sursă arată plata completă, nu trimitem notificare
+        AND (fg.total - GREATEST(
+          COALESCE(ie.total_incasat, 0),
+          COALESCE(ic.total_incasat, 0),
+          COALESCE(it.total_incasat, 0),
+          COALESCE(fg.valoare_platita, 0)
+        )) > 0
         AND COALESCE(fg.is_storno, false) = false
         AND fg.stornata_de_factura_id IS NULL
-        -- ✅ FIX 28.01.2026: Verificare case-insensitive pentru status factură
         AND LOWER(COALESCE(fg.status, '')) NOT IN ('storno', 'stornata', 'platita')
-        -- ✅ NOU 23.01.2026: Exclude facturile marcate pentru excludere din notificări
         AND COALESCE(fg.exclude_notificari_plata, false) = false
-        -- ✅ FIX 28.01.2026: Exclude facturile care au status_incasare='Incasat' în EtapeFacturi (chiar dacă valoare_incasata este 0)
-        AND fg.id NOT IN (SELECT factura_id FROM facturi_incasate_ef)
+        -- ✅ FIX 12.02.2026: Exclude facturile marcate încasate în EtapeFacturi SAU AnexeContract
+        AND fg.id NOT IN (SELECT factura_id FROM facturi_incasate_status)
       ORDER BY fg.data_scadenta ASC
     `;
 
@@ -1302,50 +1309,35 @@ export async function GET(request: NextRequest) {
 
     const facturiScadentaDepasitaQuery = `
       WITH incasari_etape AS (
-        -- ✅ FIX 24.01.2026: Agregăm încasările din EtapeFacturi pentru fiecare factură
-        SELECT
-          factura_id,
-          SUM(COALESCE(valoare_incasata, 0)) as total_incasat
+        SELECT factura_id, SUM(COALESCE(valoare_incasata, 0)) as total_incasat
         FROM ${TABLE_ETAPE_FACTURI}
         WHERE activ = true AND factura_id IS NOT NULL
         GROUP BY factura_id
       ),
       incasari_chitante AS (
-        -- ✅ FIX 26.01.2026: Agregăm încasările din Chitante (alternativă la EtapeFacturi)
-        SELECT
-          factura_id,
-          SUM(COALESCE(valoare_incasata, 0)) as total_incasat
+        SELECT factura_id, SUM(COALESCE(valoare_incasata, 0)) as total_incasat
         FROM ${TABLE_CHITANTE}
         WHERE activ = true AND COALESCE(anulata, false) = false AND factura_id IS NOT NULL
         GROUP BY factura_id
       ),
-      incasari_combinate AS (
-        -- Combinăm încasările din ambele surse
-        SELECT
-          factura_id,
-          total_incasat
-        FROM incasari_etape
-        UNION ALL
-        SELECT
-          factura_id,
-          total_incasat
-        FROM incasari_chitante
+      -- ✅ FIX 12.02.2026: Adăugat tranzacții bancare matched ca sursă suplimentară de plată
+      incasari_tranzactii AS (
+        SELECT matched_factura_id as factura_id, SUM(ABS(suma)) as total_incasat
+        FROM ${TABLE_TRANZACTII_BANCARE}
+        WHERE matched_factura_id IS NOT NULL
+          AND LOWER(COALESCE(status, '')) = 'matched'
+          AND LOWER(COALESCE(directie, '')) = 'intrare'
+        GROUP BY matched_factura_id
       ),
-      incasari_facturi AS (
-        -- Suma totală din toate sursele
-        SELECT
-          factura_id,
-          SUM(total_incasat) as total_incasat
-        FROM incasari_combinate
-        GROUP BY factura_id
-      ),
-      -- ✅ FIX 28.01.2026: CTE pentru facturile marcate ca încasate direct în EtapeFacturi (status_incasare = 'Incasat')
-      facturi_incasate_ef AS (
+      -- ✅ FIX 12.02.2026: CTE pentru facturile marcate ca încasate în EtapeFacturi SAU AnexeContract
+      facturi_incasate_status AS (
         SELECT DISTINCT factura_id
         FROM ${TABLE_ETAPE_FACTURI}
-        WHERE activ = true
-          AND factura_id IS NOT NULL
-          AND LOWER(status_incasare) = 'incasat'
+        WHERE activ = true AND factura_id IS NOT NULL AND LOWER(status_incasare) = 'incasat'
+        UNION DISTINCT
+        SELECT DISTINCT factura_id
+        FROM ${TABLE_ANEXE_CONTRACT}
+        WHERE activ = true AND factura_id IS NOT NULL AND LOWER(status_incasare) = 'incasat'
       )
       SELECT
         fg.id,
@@ -1356,29 +1348,43 @@ export async function GET(request: NextRequest) {
         fg.client_nume,
         fg.client_cui,
         fg.total,
-        -- ✅ FIX 24.01.2026 + 26.01.2026: Folosim încasările din EtapeFacturi+Chitante (prioritar) sau din FacturiGenerate (fallback)
-        COALESCE(ef.total_incasat, fg.valoare_platita, 0) as valoare_platita,
+        -- ✅ FIX 12.02.2026: GREATEST ia maximul din TOATE sursele de plată (rezolvă bug COALESCE cu 0 vs NULL)
+        GREATEST(
+          COALESCE(ie.total_incasat, 0),
+          COALESCE(ic.total_incasat, 0),
+          COALESCE(it.total_incasat, 0),
+          COALESCE(fg.valoare_platita, 0)
+        ) as valoare_platita,
         fg.proiect_id,
-        -- ✅ FIX 26.01.2026: Adăugăm ID-ul proiectului din Proiecte pentru afișare în notificări
         p.ID_Proiect as proiect_id_display,
         p.Denumire as proiect_denumire,
-        (fg.total - COALESCE(ef.total_incasat, fg.valoare_platita, 0)) as rest_de_plata,
+        (fg.total - GREATEST(
+          COALESCE(ie.total_incasat, 0),
+          COALESCE(ic.total_incasat, 0),
+          COALESCE(it.total_incasat, 0),
+          COALESCE(fg.valoare_platita, 0)
+        )) as rest_de_plata,
         DATE_DIFF(CURRENT_DATE(), fg.data_scadenta, DAY) as zile_intarziere
       FROM ${TABLE_FACTURI_GENERATE} fg
-      LEFT JOIN incasari_facturi ef ON fg.id = ef.factura_id
+      LEFT JOIN incasari_etape ie ON fg.id = ie.factura_id
+      LEFT JOIN incasari_chitante ic ON fg.id = ic.factura_id
+      LEFT JOIN incasari_tranzactii it ON fg.id = it.factura_id
       LEFT JOIN ${TABLE_PROIECTE} p ON fg.proiect_id = p.ID_Proiect
       WHERE fg.data_scadenta IS NOT NULL
         AND fg.data_scadenta < CURRENT_DATE()
-        -- ✅ FIX 24.01.2026 + 26.01.2026: Verificăm restul de plată folosind toate sursele de încasare
-        AND (fg.total - COALESCE(ef.total_incasat, fg.valoare_platita, 0)) > 0
+        -- ✅ FIX 12.02.2026: Verificare permisivă - dacă ORICARE sursă arată plata completă, nu trimitem notificare
+        AND (fg.total - GREATEST(
+          COALESCE(ie.total_incasat, 0),
+          COALESCE(ic.total_incasat, 0),
+          COALESCE(it.total_incasat, 0),
+          COALESCE(fg.valoare_platita, 0)
+        )) > 0
         AND COALESCE(fg.is_storno, false) = false
         AND fg.stornata_de_factura_id IS NULL
-        -- ✅ FIX 28.01.2026: Verificare case-insensitive pentru status factură
         AND LOWER(COALESCE(fg.status, '')) NOT IN ('storno', 'stornata', 'platita')
-        -- ✅ NOU 23.01.2026: Exclude facturile marcate pentru excludere din notificări
         AND COALESCE(fg.exclude_notificari_plata, false) = false
-        -- ✅ FIX 28.01.2026: Exclude facturile care au status_incasare='Incasat' în EtapeFacturi (chiar dacă valoare_incasata este 0)
-        AND fg.id NOT IN (SELECT factura_id FROM facturi_incasate_ef)
+        -- ✅ FIX 12.02.2026: Exclude facturile marcate încasate în EtapeFacturi SAU AnexeContract
+        AND fg.id NOT IN (SELECT factura_id FROM facturi_incasate_status)
       ORDER BY fg.data_scadenta ASC
       LIMIT 50
     `;
