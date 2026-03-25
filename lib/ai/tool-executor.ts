@@ -72,6 +72,81 @@ export async function executeTool(
         return result;
       }
 
+      // ==================== PLANNING OVERVIEW ====================
+      case 'get_planning_overview': {
+        // Default: săptămâna curentă (luni - vineri)
+        const today = new Date();
+        const dayOfWeek = today.getDay(); // 0=duminică, 1=luni...
+        const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+        const monday = new Date(today);
+        monday.setDate(today.getDate() + mondayOffset);
+        const friday = new Date(monday);
+        friday.setDate(monday.getDate() + 4);
+
+        const dataStart = toolInput.data_start || monday.toISOString().split('T')[0];
+        const dataEnd = toolInput.data_end || friday.toISOString().split('T')[0];
+
+        const params = new URLSearchParams();
+        params.set('data_start', dataStart);
+        params.set('data_end', dataEnd);
+        if (toolInput.proiect_id) params.set('proiect_id', toolInput.proiect_id);
+
+        const data = await fetchApi(context.baseUrl, `/api/analytics/planning-overview?${params}`);
+        if (!data.success) return `Eroare: ${data.details || 'Nu s-a putut obține planificarea'}`;
+
+        const result_data = data.data;
+        if (!result_data) return 'Nu sunt date de planificare disponibile.';
+
+        const { utilizatori, planificariMap, orePerZiPerUtilizator, alocareStatus, zile, statistici } = result_data;
+
+        let result = `Planificare ${formatDate(dataStart)} - ${formatDate(dataEnd)}`;
+        if (statistici) {
+          result += ` | ${statistici.total_utilizatori} utilizatori | ${formatNumber(statistici.ore_totale_planificate)} ore planificate total`;
+        }
+        result += '\n\n';
+
+        // Afișează pentru fiecare utilizator
+        for (const user of (utilizatori || [])) {
+          const userPlan = planificariMap?.[user.uid] || {};
+          const userOre = orePerZiPerUtilizator?.[user.uid] || {};
+          const userStatus = alocareStatus?.[user.uid] || {};
+
+          // Verifică dacă are ceva planificat
+          const totalOreUser = Object.values(userOre).reduce((sum: number, ore: any) => sum + (parseFloat(ore) || 0), 0);
+          if (totalOreUser === 0 && !toolInput.proiect_id) continue; // Skip utilizatori fără planificare
+
+          const numeComplet = user.nume || 'Necunoscut';
+          result += `**${numeComplet}**`;
+          if (user.rol) result += ` (${user.rol})`;
+          result += `:\n`;
+
+          for (const zi of (zile || [])) {
+            const planificari = userPlan[zi] || [];
+            const ore = parseFloat(userOre[zi]) || 0;
+            const status = userStatus[zi] || 'liber';
+
+            if (ore === 0 && planificari.length === 0) continue;
+
+            const statusEmoji = status === 'supraalocat' ? '🔴' : status === 'complet' ? '🟢' : status === 'partial' ? '🟡' : '⚪';
+            result += `  ${statusEmoji} ${formatDate(zi)} - ${ore}h:`;
+
+            for (const p of planificari) {
+              const nume = p.sarcina_titlu || p.subproiect_denumire || p.proiect_denumire || '-';
+              result += ` ${nume} (${p.ore_planificate}h)`;
+              if (planificari.length > 1) result += ';';
+            }
+            result += '\n';
+          }
+          result += '\n';
+        }
+
+        if (result.trim().endsWith(formatDate(dataEnd))) {
+          result += 'Nu există planificări pentru perioada selectată.';
+        }
+
+        return result;
+      }
+
       // ==================== UTILIZATORI ====================
       case 'search_users': {
         const params = new URLSearchParams();

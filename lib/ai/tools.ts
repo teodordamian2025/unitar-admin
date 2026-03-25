@@ -40,6 +40,29 @@ const allTools: ToolDefinition[] = [
     }
   },
 
+  // ==================== PLANNING OVERVIEW ====================
+  {
+    name: 'get_planning_overview',
+    description: 'Obține planificarea zilnică a echipei - ce proiecte/sarcini are fiecare utilizator planificate pe fiecare zi, câte ore sunt alocate, și statusul de alocare (supraalocat/complet/partial/liber). Folosește acest tool când utilizatorul întreabă despre planning, planificare, cine lucrează la ce, alocarea echipei, sau ce are cineva planificat.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        data_start: {
+          type: 'string',
+          description: 'Data de început în format YYYY-MM-DD (default: ziua curentă / luni dacă e weekend)'
+        },
+        data_end: {
+          type: 'string',
+          description: 'Data de sfârșit în format YYYY-MM-DD (default: vineri din săptămâna curentă)'
+        },
+        proiect_id: {
+          type: 'string',
+          description: 'Filtrare opțională pe un proiect/subproiect/sarcină specific'
+        }
+      }
+    }
+  },
+
   // ==================== UTILIZATORI ====================
   {
     name: 'search_users',
