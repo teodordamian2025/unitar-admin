@@ -491,6 +491,95 @@ export async function executeTool(
         return result;
       }
 
+      // ==================== FACTURI EMISE ANAF ====================
+      case 'list_facturi_emise_anaf': {
+        const params = new URLSearchParams();
+        if (toolInput.search) params.set('search', toolInput.search);
+        if (toolInput.status_anaf) params.set('status_anaf', toolInput.status_anaf);
+        if (toolInput.data_start) params.set('data_start', toolInput.data_start);
+        if (toolInput.data_end) params.set('data_end', toolInput.data_end);
+        params.set('limit', String(toolInput.limit || 20));
+
+        const data = await fetchApi(context.baseUrl, `/api/iapp/facturi-emise/list?${params}`);
+        if (!data.success) return `Eroare: ${data.details || data.error || 'Nu s-au putut obține facturile emise ANAF'}`;
+
+        const facturi = data.data || [];
+        if (facturi.length === 0) return 'Nu am găsit facturi emise ANAF cu aceste criterii.';
+
+        const total = data.pagination?.total || facturi.length;
+        let result = `${total} facturi emise ANAF (afișez ${facturi.length}):\n\n`;
+        for (const f of facturi) {
+          const serieNumar = f.serie_numar || `${f.serie || ''}${f.numar || ''}`;
+          const valoare = parseFloat(f.valoare_totala || f.total || 0);
+          const statusAnaf = f.status_anaf || f.efactura_status || '-';
+          result += `- ${serieNumar} | ${f.client_nume || f.cif_client || '-'} | ${formatNumber(valoare)} RON | Data: ${formatDate(f.data_factura)} | ANAF: ${statusAnaf}\n`;
+        }
+        return result;
+      }
+
+      // ==================== FACTURI PRIMITE ANAF ====================
+      case 'list_facturi_primite_anaf': {
+        const params = new URLSearchParams();
+        if (toolInput.search) params.set('search', toolInput.search);
+        if (toolInput.status_procesare) params.set('status_procesare', toolInput.status_procesare);
+        if (toolInput.asociat) params.set('asociat', toolInput.asociat);
+        if (toolInput.data_start) params.set('data_start', toolInput.data_start);
+        if (toolInput.data_end) params.set('data_end', toolInput.data_end);
+        params.set('limit', String(toolInput.limit || 20));
+
+        const data = await fetchApi(context.baseUrl, `/api/anaf/facturi-primite/list?${params}`);
+        if (!data.facturi && !data.success) return `Eroare: ${data.error || 'Nu s-au putut obține facturile primite'}`;
+
+        const facturi = data.facturi || [];
+        if (facturi.length === 0) return 'Nu am găsit facturi primite ANAF cu aceste criterii.';
+
+        const total = data.total || facturi.length;
+        let totalValoare = 0;
+        let result = `${total} facturi primite ANAF (afișez ${facturi.length}):\n\n`;
+        for (const f of facturi) {
+          const valoare = parseFloat(f.valoare_totala || 0);
+          totalValoare += valoare;
+          const status = f.status_procesare || '-';
+          const asociat = f.cheltuiala_asociata_id ? '✅ asociată' : '⚠️ neasociată';
+          result += `- ${f.serie_numar || '-'} | Emitent: ${f.nume_emitent || f.cif_emitent || '-'} | ${formatNumber(valoare)} ${f.moneda || 'RON'} | Data: ${formatDate(f.data_factura)} | Status: ${status} | ${asociat}\n`;
+        }
+        result += `\nTotal: ${formatNumber(totalValoare)} RON`;
+        return result;
+      }
+
+      // ==================== TRANZACȚII BANCARE ====================
+      case 'list_tranzactii_bancare': {
+        const params = new URLSearchParams();
+        params.set('data', 'transactions');
+        if (toolInput.data_start) params.set('data_start', toolInput.data_start);
+        if (toolInput.data_end) params.set('data_end', toolInput.data_end);
+        if (toolInput.directie) params.set('directie', toolInput.directie);
+        if (toolInput.search_contrapartida) params.set('search_contrapartida', toolInput.search_contrapartida);
+        if (toolInput.matching_tip) params.set('matching_tip', toolInput.matching_tip);
+        params.set('limit', String(toolInput.limit || 20));
+
+        const data = await fetchApi(context.baseUrl, `/api/tranzactii/dashboard?${params}`);
+        if (!data.success) return `Eroare: ${data.error || 'Nu s-au putut obține tranzacțiile bancare'}`;
+
+        const tranzactii = data.transactions || [];
+        if (tranzactii.length === 0) return 'Nu am găsit tranzacții bancare cu aceste criterii.';
+
+        const totalCount = data.pagination?.totalCount || tranzactii.length;
+        let totalIntrari = 0;
+        let totalIesiri = 0;
+        let result = `${totalCount} tranzacții bancare (afișez ${tranzactii.length}):\n\n`;
+        for (const t of tranzactii) {
+          const suma = parseFloat(t.suma || 0);
+          const directie = t.directie === 'intrare' ? '📥' : '📤';
+          if (t.directie === 'intrare') totalIntrari += suma;
+          else totalIesiri += suma;
+          const matching = t.matching_tip === 'matched' ? '✅' : t.matching_tip === 'partial' ? '🟡' : '⚪';
+          result += `- ${directie} ${formatDate(t.data_procesare || t.data_tranzactie)} | ${formatNumber(suma)} RON | ${t.contrapartida_nume || '-'} | ${matching} ${t.matching_tip || 'nematched'}\n`;
+        }
+        result += `\nTotal intrări: ${formatNumber(totalIntrari)} RON | Total ieșiri: ${formatNumber(totalIesiri)} RON`;
+        return result;
+      }
+
       default:
         return `Tool necunoscut: ${toolName}`;
     }

@@ -384,13 +384,117 @@ const allTools: ToolDefinition[] = [
   },
   {
     name: 'list_expenses',
-    description: 'Listează cheltuielile proiectelor (subcontractanți, materiale, etc). Doar pentru admin.',
+    description: 'Listează cheltuielile proiectelor - plăți către subcontractanți, materiale, servicii externe, etc. Aceasta este pagina "Cheltuieli Subcontractanți" din admin. Doar pentru admin.',
     input_schema: {
       type: 'object',
       properties: {
         proiect_id: {
           type: 'string',
           description: 'ID-ul proiectului pentru cheltuieli specifice'
+        },
+        search: {
+          type: 'string',
+          description: 'Căutare în furnizor, descriere cheltuială'
+        },
+        limit: {
+          type: 'number',
+          description: 'Numărul maxim de rezultate (default: 20)'
+        }
+      }
+    },
+    adminOnly: true
+  },
+  {
+    name: 'list_facturi_emise_anaf',
+    description: 'Listează facturile emise trimise la ANAF prin e-Factura (iapp.ro). Arată statusul ANAF (trimis, acceptat, eroare), detalii factură, client, valoare. Folosește acest tool când utilizatorul întreabă despre facturi trimise la ANAF, e-factura, sau statusul facturilor la ANAF. Doar pentru admin.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        search: {
+          type: 'string',
+          description: 'Căutare după serie, număr, client'
+        },
+        status_anaf: {
+          type: 'string',
+          description: 'Filtru status ANAF: "trimis", "acceptat", "eroare", "netrimis"'
+        },
+        data_start: {
+          type: 'string',
+          description: 'Data de început filtrare (YYYY-MM-DD)'
+        },
+        data_end: {
+          type: 'string',
+          description: 'Data de sfârșit filtrare (YYYY-MM-DD)'
+        },
+        limit: {
+          type: 'number',
+          description: 'Numărul maxim de rezultate (default: 20)'
+        }
+      }
+    },
+    adminOnly: true
+  },
+  {
+    name: 'list_facturi_primite_anaf',
+    description: 'Listează facturile primite de la furnizori prin ANAF e-Factura - facturi descărcate automat din SPV. Arată emitent, valoare, status procesare, asociere cu cheltuieli. Folosește acest tool când utilizatorul întreabă despre facturi primite, facturi de la furnizori, sau facturi din ANAF. Doar pentru admin.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        search: {
+          type: 'string',
+          description: 'Căutare după emitent, serie, număr'
+        },
+        status_procesare: {
+          type: 'string',
+          description: 'Filtru status: "nou", "procesat", "asociat", "eroare"'
+        },
+        asociat: {
+          type: 'string',
+          enum: ['true', 'false'],
+          description: '"true" pentru asociate cu cheltuieli, "false" pentru neasociate'
+        },
+        data_start: {
+          type: 'string',
+          description: 'Data de început (YYYY-MM-DD)'
+        },
+        data_end: {
+          type: 'string',
+          description: 'Data de sfârșit (YYYY-MM-DD)'
+        },
+        limit: {
+          type: 'number',
+          description: 'Numărul maxim de rezultate (default: 20)'
+        }
+      }
+    },
+    adminOnly: true
+  },
+  {
+    name: 'list_tranzactii_bancare',
+    description: 'Listează tranzacțiile bancare din cont (importate din SmartFintech sau CSV). Arată intrări/ieșiri, sume, contrapartide, status matching cu facturi. Folosește acest tool când utilizatorul întreabă despre tranzacții bancare, extrase de cont, sold, mișcări în cont, sau plăți/încasări bancare. Doar pentru admin.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        data_start: {
+          type: 'string',
+          description: 'Data de început (YYYY-MM-DD)'
+        },
+        data_end: {
+          type: 'string',
+          description: 'Data de sfârșit (YYYY-MM-DD)'
+        },
+        directie: {
+          type: 'string',
+          enum: ['intrare', 'iesire'],
+          description: 'Filtru direcție: "intrare" (încasări) sau "iesire" (plăți)'
+        },
+        search_contrapartida: {
+          type: 'string',
+          description: 'Căutare după numele contrapartidei (cine a trimis/primit banii)'
+        },
+        matching_tip: {
+          type: 'string',
+          description: 'Filtru matching: "matched", "none", "partial"'
         },
         limit: {
           type: 'number',
