@@ -1,9 +1,7 @@
 // app/components/UserChatbot.tsx
-
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { useDropzone } from 'react-dropzone';
 
 type Message = {
   from: 'user' | 'bot';
@@ -11,17 +9,60 @@ type Message = {
 };
 
 interface UserChatbotProps {
-  userRole: string | null;
-  userPermissions: any;
+  userId: string;
+  userRole: string;
+  userName: string;
 }
 
-export default function UserChatbot({ userRole, userPermissions }: UserChatbotProps) {
+export default function UserChatbot({ userId, userRole, userName }: UserChatbotProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [sessionId] = useState(() => Math.random().toString(36).substr(2, 9));
+  const [isOpen, setIsOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [isListening, setIsListening] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const recognitionRef = useRef<any>(null);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  const toggleVoice = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setMessages(prev => [...prev, { from: 'bot', text: 'Browser-ul nu suportă recunoașterea vocală. Folosește Chrome sau Safari.' }]);
+      return;
+    }
+
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'ro-RO';
+    recognition.continuous = false;
+    recognition.interimResults = false;
+
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      setInput(prev => prev ? `${prev} ${transcript}` : transcript);
+      setIsListening(false);
+    };
+
+    recognition.onerror = () => setIsListening(false);
+    recognition.onend = () => setIsListening(false);
+
+    recognitionRef.current = recognition;
+    recognition.start();
+    setIsListening(true);
+  };
 
   const handleSend = async () => {
     const trimmed = input.trim();
@@ -33,60 +74,24 @@ export default function UserChatbot({ userRole, userPermissions }: UserChatbotPr
     setLoading(true);
 
     try {
-      const lower = trimmed.toLowerCase();
-      
-      // Verifică dacă utilizatorul încearcă să acceseze informații financiare
-      const isFinancialQuery = lower.includes('factură') || lower.includes('facturi') ||
-                              lower.includes('plată') || lower.includes('plăți') ||
-                              lower.includes('bancă') || lower.includes('tranzacție') ||
-                              lower.includes('suma') || lower.includes('valoare') ||
-                              lower.includes('buget') || lower.includes('cost') ||
-                              lower.includes('financiar') || lower.includes('bani');
+      // Tot merge la Claude AI - restricțiile de rol se fac pe backend prin filtrarea tools
+      const res = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: trimmed,
+          sessionId,
+          userId,
+          userRole,
+          userName
+        }),
+      });
 
-      if (isFinancialQuery && userRole === 'normal') {
-        const botMessage: Message = { 
-          from: 'bot', 
-          text: '🚫 Nu ai permisiunea să accesezi informații financiare. Contactează un administrator pentru detalii.' 
-        };
-        setMessages(prev => [...prev, botMessage]);
-        setLoading(false);
-        return;
-      }
-
-      // Verifică dacă este despre proiecte (permis pentru utilizatori normali)
-      const isProjectQuery = lower.includes('proiect') || lower.includes('proiecte') ||
-                             lower.includes('timp') || lower.includes('lucrat') ||
-                             lower.includes('ore') || lower.includes('activitate') ||
-                             lower.includes('raport') || lower.includes('progres') ||
-                             lower.includes('deadline') || lower.includes('termen');
-
-      if (isProjectQuery) {
-        // Folosește endpoint special pentru utilizatori normali
-        const res = await fetch('/api/user-database', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            prompt: trimmed, 
-            sessionId,
-            userRole,
-            userPermissions
-          }),
-        });
-
-        const data = await res.json();
-        const botMessage: Message = { from: 'bot', text: data.reply || 'Fără răspuns.' };
-        setMessages(prev => [...prev, botMessage]);
+      const data = await res.json();
+      if (data.error) {
+        setMessages(prev => [...prev, { from: 'bot', text: `⚠️ ${data.error}` }]);
       } else {
-        // Pentru întrebări generale
-        const res = await fetch('/api/queryOpenAI', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: trimmed }),
-        });
-
-        const data = await res.json();
-        const botMessage: Message = { from: 'bot', text: data.reply || 'Fără răspuns.' };
-        setMessages(prev => [...prev, botMessage]);
+        setMessages(prev => [...prev, { from: 'bot', text: data.reply || 'Fără răspuns.' }]);
       }
 
     } catch (err) {
@@ -98,114 +103,260 @@ export default function UserChatbot({ userRole, userPermissions }: UserChatbotPr
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && e.ctrlKey) {
+    if (isMobile && e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    } else if (!isMobile && e.key === 'Enter' && e.ctrlKey) {
       e.preventDefault();
       handleSend();
     }
   };
 
-  const onDrop = useCallback((acceptedFiles: File[]) => {
-    const file = acceptedFiles[0];
-    if (file) {
-      setUploadedFile(file);
-      setMessages(prev => [...prev, {
-        from: 'user',
-        text: `Am încărcat fișierul: ${file.name}`
-      }]);
-    }
-  }, []);
-
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop });
-
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  const formatText = (text: string) => {
+    const parts = text.split(/(\*\*[^*]+\*\*)/g);
+    return (
+      <>
+        {parts.map((part, i) => {
+          if (part.startsWith('**') && part.endsWith('**')) {
+            return <strong key={i}>{part.slice(2, -2)}</strong>;
+          }
+          return part.split('\n').map((line, j) => (
+            <span key={`${i}-${j}`}>
+              {j > 0 && <br />}
+              {line}
+            </span>
+          ));
+        })}
+      </>
+    );
+  };
+
+  if (!isOpen) {
+    return (
+      <button
+        onClick={() => setIsOpen(true)}
+        style={{
+          position: 'fixed',
+          bottom: isMobile ? '20px' : '20px',
+          right: isMobile ? '20px' : '20px',
+          width: '56px',
+          height: '56px',
+          borderRadius: '50%',
+          background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+          color: 'white',
+          border: 'none',
+          cursor: 'pointer',
+          zIndex: 9999,
+          boxShadow: '0 4px 15px rgba(79, 172, 254, 0.4)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '24px',
+          transition: 'transform 0.2s'
+        }}
+        onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.1)')}
+        onMouseLeave={e => (e.currentTarget.style.transform = 'scale(1)')}
+        title="Asistent AI"
+      >
+        💬
+      </button>
+    );
+  }
+
+  const containerStyle: React.CSSProperties = isMobile ? {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    width: '100vw',
+    height: '100vh',
+    background: '#fefefe',
+    zIndex: 10000,
+    display: 'flex',
+    flexDirection: 'column'
+  } : {
+    position: 'fixed',
+    bottom: '20px',
+    right: '20px',
+    width: '380px',
+    maxHeight: '70vh',
+    background: '#fefefe',
+    border: '1px solid #e0e0e0',
+    borderRadius: '16px',
+    zIndex: 9999,
+    boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
+    display: 'flex',
+    flexDirection: 'column'
+  };
+
   return (
-    <div style={{
-      position: 'fixed',
-      bottom: '10px',
-      right: '10px',
-      width: '340px',
-      background: '#fefefe',
-      border: '1px solid #ccc',
-      borderRadius: '8px',
-      zIndex: 9999,
-      boxShadow: '0 0 10px rgba(0,0,0,0.1)',
-      display: 'flex',
-      flexDirection: 'column',
-      maxHeight: '90vh'
-    }}>
+    <div style={containerStyle}>
+      {/* Header */}
       <div style={{
-        background: userRole === 'admin' ? '#4caf50' : '#2196f3',
+        background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
         color: 'white',
-        padding: '10px',
-        textAlign: 'center',
-        fontWeight: 'bold',
-        borderTopLeftRadius: '8px',
-        borderTopRightRadius: '8px'
+        padding: isMobile ? '16px 20px' : '12px 16px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        borderTopLeftRadius: isMobile ? 0 : '16px',
+        borderTopRightRadius: isMobile ? 0 : '16px',
       }}>
-        Asistent AI - {userRole === 'admin' ? 'Admin' : 'Utilizator'}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '20px' }}>🤖</span>
+          <span style={{ fontWeight: 'bold', fontSize: '15px' }}>Asistent UNITAR</span>
+        </div>
+        <button
+          onClick={() => setIsOpen(false)}
+          style={{
+            background: 'rgba(255,255,255,0.2)',
+            border: 'none',
+            color: 'white',
+            width: '32px',
+            height: '32px',
+            borderRadius: '50%',
+            cursor: 'pointer',
+            fontSize: '16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        >
+          ✕
+        </button>
       </div>
 
+      {/* Mesaje */}
       <div style={{
         flex: 1,
         overflowY: 'auto',
-        padding: '10px',
-        paddingBottom: '0'
+        padding: '12px',
+        paddingBottom: '4px',
+        minHeight: isMobile ? undefined : '200px'
       }}>
+        {messages.length === 0 && (
+          <div style={{
+            textAlign: 'center',
+            color: '#888',
+            padding: '20px',
+            fontSize: '14px'
+          }}>
+            Bună, {userName}! Sunt asistentul tău AI. Întreabă-mă despre proiectele tale, sarcini, ore lucrate, sau orice altceva.
+          </div>
+        )}
         {messages.map((msg, index) => (
-          <div key={index} style={{ textAlign: msg.from === 'user' ? 'right' : 'left', margin: '5px 0' }}>
-            <span style={{
-              display: 'inline-block',
-              padding: '6px 10px',
-              borderRadius: '12px',
-              background: msg.from === 'user' ? '#dcf8c6' : '#e0e0e0',
-              maxWidth: '90%',
-              wordWrap: 'break-word'
+          <div key={index} style={{
+            display: 'flex',
+            justifyContent: msg.from === 'user' ? 'flex-end' : 'flex-start',
+            margin: '6px 0'
+          }}>
+            <div style={{
+              padding: '8px 12px',
+              borderRadius: msg.from === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+              background: msg.from === 'user'
+                ? 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)'
+                : '#f0f0f5',
+              color: msg.from === 'user' ? 'white' : '#333',
+              maxWidth: '85%',
+              wordWrap: 'break-word',
+              fontSize: '14px',
+              lineHeight: '1.4',
+              whiteSpace: 'pre-wrap'
             }}>
-              {msg.text}
-            </span>
+              {formatText(msg.text)}
+            </div>
           </div>
         ))}
+        {loading && (
+          <div style={{ display: 'flex', justifyContent: 'flex-start', margin: '6px 0' }}>
+            <div style={{
+              padding: '8px 16px',
+              borderRadius: '16px 16px 16px 4px',
+              background: '#f0f0f5',
+              color: '#888',
+              fontSize: '14px'
+            }}>
+              Se gândește...
+            </div>
+          </div>
+        )}
         <div ref={messagesEndRef} />
       </div>
 
-      <div style={{ padding: '10px', borderTop: '1px solid #ccc' }}>
-        <textarea
-          rows={3}
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Întreabă despre proiecte, timp lucrat, rapoarte..."
-          style={{
-            width: '100%',
-            resize: 'none',
-            padding: '8px',
-            borderRadius: '6px',
-            border: '1px solid #ccc',
-            fontSize: '14px'
-          }}
-        />
+      {/* Input */}
+      <div style={{
+        padding: '12px',
+        borderTop: '1px solid #eee',
+        paddingBottom: isMobile ? 'max(12px, env(safe-area-inset-bottom))' : '12px'
+      }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
+          <textarea
+            rows={isMobile ? 1 : 2}
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={isMobile ? 'Scrie un mesaj...' : 'Scrie un mesaj... (Ctrl+Enter)'}
+            style={{
+              flex: 1,
+              resize: 'none',
+              padding: '10px 12px',
+              borderRadius: '12px',
+              border: '1px solid #ddd',
+              fontSize: '14px',
+              outline: 'none',
+              fontFamily: 'inherit',
+              lineHeight: '1.4'
+            }}
+          />
 
-        <button
-          onClick={handleSend}
-          disabled={loading}
-          style={{
-            marginTop: '8px',
-            width: '100%',
-            padding: '8px',
-            background: userRole === 'admin' ? '#4caf50' : '#2196f3',
-            color: 'white',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: loading ? 'not-allowed' : 'pointer'
-          }}
-        >
-          {loading ? 'Se generează...' : 'Trimite'}
-        </button>
+          <button
+            onClick={toggleVoice}
+            style={{
+              width: '44px',
+              height: '44px',
+              borderRadius: '50%',
+              border: 'none',
+              background: isListening ? '#ef4444' : '#f0f0f5',
+              color: isListening ? 'white' : '#666',
+              cursor: 'pointer',
+              fontSize: '18px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0
+            }}
+            title={isListening ? 'Oprește ascultarea' : 'Dictează mesajul'}
+          >
+            🎤
+          </button>
+
+          <button
+            onClick={handleSend}
+            disabled={loading || !input.trim()}
+            style={{
+              width: '44px',
+              height: '44px',
+              borderRadius: '50%',
+              border: 'none',
+              background: loading || !input.trim()
+                ? '#ddd'
+                : 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+              color: 'white',
+              cursor: loading || !input.trim() ? 'not-allowed' : 'pointer',
+              fontSize: '18px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0
+            }}
+          >
+            ➤
+          </button>
+        </div>
       </div>
     </div>
   );
 }
-

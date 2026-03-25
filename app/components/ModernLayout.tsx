@@ -16,6 +16,9 @@ import { toast } from 'react-toastify';
 import PersistentTimer from './PersistentTimer';
 import ActiveTimerNotification from './ActiveTimerNotification';
 import NotificationBell from './notifications/NotificationBell';
+import dynamic from 'next/dynamic';
+
+const Chatbot = dynamic(() => import('@/components/Chatbot'), { ssr: false });
 
 interface ModernLayoutProps {
   children: ReactNode;
@@ -558,6 +561,15 @@ export default function ModernLayout({ children, user, displayName = 'Utilizator
           {children}
         </div>
       </div>
+
+      {/* Chatbot AI */}
+      {user?.uid && (
+        <Chatbot
+          userId={user.uid}
+          userRole={userRole || 'admin'}
+          userName={displayName}
+        />
+      )}
     </div>
   );
 }

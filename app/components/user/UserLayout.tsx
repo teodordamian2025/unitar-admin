@@ -16,6 +16,9 @@ import { toast } from 'react-toastify';
 import UserPersistentTimer from './UserPersistentTimer';
 import ActiveTimerNotification from '../ActiveTimerNotification';
 import NotificationBell from '../notifications/NotificationBell';
+import dynamic from 'next/dynamic';
+
+const UserChatbot = dynamic(() => import('@/app/components/UserChatbot'), { ssr: false });
 
 interface UserLayoutProps {
   children: ReactNode;
@@ -450,6 +453,15 @@ export default function UserLayout({ children, user, displayName = 'Utilizator',
           {children}
         </main>
       </div>
+
+      {/* Chatbot AI */}
+      {user?.uid && (
+        <UserChatbot
+          userId={user.uid}
+          userRole={userRole || 'normal'}
+          userName={displayName}
+        />
+      )}
     </div>
   );
 }
