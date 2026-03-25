@@ -323,6 +323,44 @@ const allTools: ToolDefinition[] = [
 
   // ==================== FINANCIAR (ADMIN ONLY) ====================
   {
+    name: 'list_propuneri_incasari',
+    description: 'Listează propunerile de încasări - match-uri automate între tranzacții bancare primite și facturile emise. Arată ce plăți pot fi asociate cu ce facturi, cu scorul de potrivire. Folosește acest tool când utilizatorul întreabă despre propuneri de încasări, match-uri bancare, sau plăți de asociat.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        status: {
+          type: 'string',
+          enum: ['pending', 'approved', 'rejected', 'all'],
+          description: 'Filtru status propunere (default: "pending" - în așteptare)'
+        },
+        limit: {
+          type: 'number',
+          description: 'Numărul maxim de rezultate (default: 20)'
+        }
+      }
+    },
+    adminOnly: true
+  },
+  {
+    name: 'list_propuneri_plati',
+    description: 'Listează propunerile de plăți către subcontractanți - match-uri între facturile primite de la furnizori și cheltuielile din proiecte. Arată ce plăți trebuie făcute către furnizori. Folosește acest tool când utilizatorul întreabă despre propuneri de plăți, plăți către furnizori/subcontractanți, sau facturi de plătit.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        status: {
+          type: 'string',
+          enum: ['pending', 'approved', 'rejected', 'all'],
+          description: 'Filtru status propunere (default: "pending" - în așteptare)'
+        },
+        limit: {
+          type: 'number',
+          description: 'Numărul maxim de rezultate (default: 20)'
+        }
+      }
+    },
+    adminOnly: true
+  },
+  {
     name: 'list_invoices',
     description: 'Listează facturile emise. Returnează număr factură, client, valoare, dată, status încasare. Doar pentru admin.',
     input_schema: {

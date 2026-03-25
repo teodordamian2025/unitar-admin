@@ -375,6 +375,68 @@ export async function executeTool(
       }
 
       // ==================== FINANCIAR (ADMIN) ====================
+      case 'list_propuneri_incasari': {
+        const params = new URLSearchParams();
+        params.set('status', toolInput.status || 'pending');
+        params.set('limit', String(toolInput.limit || 20));
+        params.set('include_stats', 'true');
+
+        const data = await fetchApi(context.baseUrl, `/api/incasari/propuneri?${params}`);
+        if (!data.success) return `Eroare: ${data.details || 'Nu s-au putut obține propunerile de încasări'}`;
+
+        const propuneri = data.propuneri || [];
+        const stats = data.stats;
+
+        let result = '';
+        if (stats) {
+          result += `Statistici propuneri încasări: ${stats.pending || 0} în așteptare | ${stats.approved || 0} aprobate | ${stats.rejected || 0} respinse\n\n`;
+        }
+
+        if (propuneri.length === 0) {
+          result += `Nu există propuneri de încasări cu status "${toolInput.status || 'pending'}".`;
+          return result;
+        }
+
+        result += `${propuneri.length} propuneri de încasări:\n\n`;
+        for (const p of propuneri) {
+          const score = Math.round((p.score || 0) * 100);
+          const valid = p.is_valid ? '✅' : '⚠️ invalidă';
+          result += `- ${p.factura_serie || ''}${p.factura_numar || '-'} ↔ Tranzacție ${formatDate(p.tranzactie_data)} | Factură: ${formatNumber(p.suma_factura)} RON | Tranzacție: ${formatNumber(p.suma_tranzactie)} RON | Score: ${score}% | ${valid}${p.auto_approvable ? ' 🤖 auto' : ''}\n`;
+          if (p.client_nume) result += `  Client: ${p.client_nume}\n`;
+        }
+        return result;
+      }
+
+      case 'list_propuneri_plati': {
+        const params = new URLSearchParams();
+        params.set('status', toolInput.status || 'pending');
+        params.set('limit', String(toolInput.limit || 20));
+        params.set('include_stats', 'true');
+
+        const data = await fetchApi(context.baseUrl, `/api/plati/propuneri?${params}`);
+        if (!data.success) return `Eroare: ${data.details || 'Nu s-au putut obține propunerile de plăți'}`;
+
+        const propuneri = data.propuneri || [];
+        const stats = data.stats;
+
+        let result = '';
+        if (stats) {
+          result += `Statistici propuneri plăți: ${stats.pending || 0} în așteptare | ${stats.approved || 0} aprobate | ${stats.rejected || 0} respinse${stats.expired ? ` | ${stats.expired} expirate` : ''}\n\n`;
+        }
+
+        if (propuneri.length === 0) {
+          result += `Nu există propuneri de plăți cu status "${toolInput.status || 'pending'}".`;
+          return result;
+        }
+
+        result += `${propuneri.length} propuneri de plăți:\n\n`;
+        for (const p of propuneri) {
+          const score = Math.round((parseFloat(p.score) || 0) * 100);
+          result += `- Furnizor: ${p.furnizor_nume || p.cheltuiala_furnizor || '-'} | Sumă: ${formatNumber(p.suma_cheltuiala || p.valoare)} RON | Score: ${score}%${p.auto_approvable ? ' 🤖 auto' : ''} | Proiect: ${p.proiect_denumire || p.proiect_id || '-'}\n`;
+        }
+        return result;
+      }
+
       case 'list_invoices': {
         const params = new URLSearchParams();
         if (toolInput.search) params.set('search', toolInput.search);
