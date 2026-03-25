@@ -547,6 +547,22 @@ export async function executeTool(
         return result;
       }
 
+      // ==================== SOLD BANCAR ====================
+      case 'get_sold_bancar': {
+        const data = await fetchApi(context.baseUrl, '/api/tranzactii/smartfintech/balance');
+        if (!data.success) return `Eroare: ${data.error || 'Nu s-a putut obține soldul bancar. SmartFintech poate să nu fie configurat.'}`;
+
+        const balance = data.balance;
+        if (!balance) return 'Nu sunt date despre sold disponibile. Verifică configurarea SmartFintech.';
+
+        let result = `Sold bancar disponibil: **${formatNumber(balance.availableBalance || balance.available_balance || balance.balance)} RON**`;
+        if (balance.accountHolder) result += `\nTitular: ${balance.accountHolder}`;
+        if (balance.iban) result += `\nIBAN: ${balance.iban}`;
+        if (balance.lastUpdated || balance.last_updated) result += `\nActualizat: ${formatDate(balance.lastUpdated || balance.last_updated)}`;
+        if (balance.cached) result += ' (din cache)';
+        return result;
+      }
+
       // ==================== TRANZACȚII BANCARE ====================
       case 'list_tranzactii_bancare': {
         const params = new URLSearchParams();

@@ -162,7 +162,10 @@ export async function POST(request: NextRequest) {
     const textBlocks = response.content.filter(
       (block: any) => block.type === 'text'
     );
-    const reply = textBlocks.map((block: any) => block.text).join('\n') || 'Nu am putut genera un răspuns.';
+    let reply = textBlocks.map((block: any) => block.text).join('\n') || 'Nu am putut genera un răspuns.';
+
+    // Decodează Unicode escapes (ex: \u0103 → ă) în cazul în care modelul le generează literal
+    reply = reply.replace(/\\u([0-9a-fA-F]{4})/g, (_, code) => String.fromCharCode(parseInt(code, 16)));
 
     // Adaugă răspunsul final în istoric
     session.messages.push({

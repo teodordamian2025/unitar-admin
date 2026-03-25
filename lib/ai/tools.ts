@@ -470,6 +470,15 @@ const allTools: ToolDefinition[] = [
     adminOnly: true
   },
   {
+    name: 'get_sold_bancar',
+    description: 'Obține soldul disponibil curent din contul bancar (SmartFintech). Folosește acest tool când utilizatorul întreabă despre sold, bani în cont, disponibil, sau cât avem în cont. Doar pentru admin.',
+    input_schema: {
+      type: 'object',
+      properties: {}
+    },
+    adminOnly: true
+  },
+  {
     name: 'list_tranzactii_bancare',
     description: 'Listează tranzacțiile bancare din cont (importate din SmartFintech sau CSV). Arată intrări/ieșiri, sume, contrapartide, status matching cu facturi. Folosește acest tool când utilizatorul întreabă despre tranzacții bancare, extrase de cont, sold, mișcări în cont, sau plăți/încasări bancare. Doar pentru admin.',
     input_schema: {
