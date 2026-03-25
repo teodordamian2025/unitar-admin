@@ -287,28 +287,35 @@ export async function executeTool(
         if (toolInput.status) params.set('status', toolInput.status);
         params.set('limit', String(toolInput.limit || 20));
 
-        const data = await fetchApi(context.baseUrl, `/api/rapoarte/facturi?${params}`);
+        const data = await fetchApi(context.baseUrl, `/api/actions/invoices/list?${params}`);
         if (!data.success) return `Eroare: ${data.details || 'Nu s-au putut obține facturile'}`;
 
-        const invoices = data.data || [];
+        const invoices = data.facturi || [];
         if (invoices.length === 0) return 'Nu am găsit facturi cu aceste criterii.';
 
+        const total = data.pagination?.total || invoices.length;
         let totalValoare = 0;
-        let result = `Am găsit ${invoices.length} facturi:\n\n`;
+        let restDePlata = 0;
+        let result = `Am găsit ${total} facturi (afișez ${invoices.length}):\n\n`;
         for (const f of invoices) {
-          const valoare = parseFloat(f.valoare || f.Valoare || 0);
+          const valoare = parseFloat(f.total || 0);
           totalValoare += valoare;
-          const moneda = f.moneda || f.Moneda || 'RON';
-          result += `- ${f.numar_factura || f.Numar_Factura || '-'} | ${f.client || f.Client || '-'} | ${formatNumber(valoare)} ${moneda} | Data: ${formatDate(f.data_factura || f.Data_Factura)} | Status: ${f.status_incasare || f.Status_Incasare || '-'}\n`;
+          restDePlata += parseFloat(f.rest_de_plata || 0);
+          const numar = f.serie && f.numar ? `${f.serie}-${f.numar}` : '-';
+          const statusPlata = f.status_incasari || '-';
+          const scadenta = f.zile_pana_scadenta != null
+            ? (f.zile_pana_scadenta < 0 ? `⚠️ depășită cu ${Math.abs(f.zile_pana_scadenta)} zile` : `${f.zile_pana_scadenta} zile rămase`)
+            : '';
+          result += `- ${numar} | ${f.client_nume || '-'} | ${formatNumber(valoare)} RON | Data: ${formatDate(f.data_factura)} | Plată: ${statusPlata} | ${scadenta}\n`;
         }
-        result += `\nTotal: ${formatNumber(totalValoare)} RON`;
+        result += `\nTotal facturat: ${formatNumber(totalValoare)} RON | Rest de plată: ${formatNumber(restDePlata)} RON`;
         return result;
       }
 
       case 'list_expenses': {
         const params = new URLSearchParams();
-        if (toolInput.proiect_id) params.set('proiect_id', toolInput.proiect_id);
-        params.set('limit', String(toolInput.limit || 20));
+        if (toolInput.proiect_id) params.set('proiectId', toolInput.proiect_id);
+        if (toolInput.search) params.set('search', toolInput.search);
 
         const data = await fetchApi(context.baseUrl, `/api/rapoarte/cheltuieli?${params}`);
         if (!data.success) return `Eroare: ${data.details || 'Nu s-au putut obține cheltuielile'}`;
@@ -319,9 +326,10 @@ export async function executeTool(
         let total = 0;
         let result = `Am găsit ${expenses.length} cheltuieli:\n\n`;
         for (const e of expenses) {
-          const valoare = parseFloat(e.valoare || e.Valoare || 0);
+          const valoare = parseFloat(e.valoare_ron || e.valoare || 0);
           total += valoare;
-          result += `- ${e.descriere || e.Descriere || '-'} | ${formatNumber(valoare)} RON | Furnizor: ${e.furnizor || e.Furnizor || '-'} | Data: ${formatDate(e.data || e.Data)}\n`;
+          const moneda = e.moneda || 'RON';
+          result += `- ${e.descriere || '-'} | ${formatNumber(valoare)} RON${moneda !== 'RON' ? ` (${formatNumber(e.valoare)} ${moneda})` : ''} | Tip: ${e.tip_cheltuiala || '-'} | Furnizor: ${e.furnizor_nume || '-'} | Data: ${formatDate(e.data_cheltuiala)}\n`;
         }
         result += `\nTotal cheltuieli: ${formatNumber(total)} RON`;
         return result;

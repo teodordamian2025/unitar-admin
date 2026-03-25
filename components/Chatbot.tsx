@@ -219,28 +219,32 @@ export default function Chatbot({ userId = 'admin', userRole = 'admin', userName
         onClick={() => setIsOpen(true)}
         style={{
           position: 'fixed',
-          bottom: isMobile ? '20px' : '20px',
-          right: isMobile ? '20px' : '20px',
-          width: '56px',
-          height: '56px',
-          borderRadius: '50%',
+          bottom: isMobile ? '24px' : '20px',
+          right: isMobile ? '24px' : '20px',
+          height: isMobile ? '56px' : '56px',
+          borderRadius: isMobile ? '28px' : '50%',
+          padding: isMobile ? '0 20px 0 16px' : '0',
+          width: isMobile ? 'auto' : '56px',
+          minWidth: isMobile ? undefined : '56px',
           background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
           color: 'white',
           border: 'none',
           cursor: 'pointer',
           zIndex: 9999,
-          boxShadow: '0 4px 15px rgba(102, 126, 234, 0.4)',
+          boxShadow: '0 4px 20px rgba(102, 126, 234, 0.5)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
+          gap: isMobile ? '8px' : '0',
           fontSize: '24px',
           transition: 'transform 0.2s'
         }}
-        onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.1)')}
+        onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.05)')}
         onMouseLeave={e => (e.currentTarget.style.transform = 'scale(1)')}
         title="Asistent AI"
       >
-        💬
+        <span>🤖</span>
+        {isMobile && <span style={{ fontSize: '14px', fontWeight: 'bold' }}>Asistent AI</span>}
       </button>
     );
   }
@@ -251,11 +255,12 @@ export default function Chatbot({ userId = 'admin', userRole = 'admin', userName
     top: 0,
     left: 0,
     width: '100vw',
-    height: '100vh',
+    height: '100dvh',
     background: '#fefefe',
     zIndex: 10000,
     display: 'flex',
-    flexDirection: 'column'
+    flexDirection: 'column',
+    overflow: 'hidden'
   } : {
     position: 'fixed',
     bottom: '20px',
