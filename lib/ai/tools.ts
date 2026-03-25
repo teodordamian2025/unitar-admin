@@ -40,6 +40,22 @@ const allTools: ToolDefinition[] = [
     }
   },
 
+  // ==================== UTILIZATORI ====================
+  {
+    name: 'search_users',
+    description: 'Caută utilizatori (membri ai echipei) după nume. Returnează UID-ul, numele complet, email-ul și rolul. IMPORTANT: Folosește MEREU acest tool înainte de a căuta sarcini, ore lucrate sau alte date pentru un alt utilizator - ai nevoie de UID-ul lor. Exemplu: dacă utilizatorul întreabă "ce a lucrat Mircea azi?", caută mai întâi utilizatorul Mircea pentru a-i obține UID-ul.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        search: {
+          type: 'string',
+          description: 'Numele sau prenumele utilizatorului de căutat (potrivire parțială, ex: "Mircea" sau "Vasile")'
+        }
+      },
+      required: ['search']
+    }
+  },
+
   // ==================== SARCINI ====================
   {
     name: 'list_tasks',

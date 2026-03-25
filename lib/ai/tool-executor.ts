@@ -72,6 +72,25 @@ export async function executeTool(
         return result;
       }
 
+      // ==================== UTILIZATORI ====================
+      case 'search_users': {
+        const params = new URLSearchParams();
+        if (toolInput.search) params.set('search', toolInput.search);
+        params.set('limit', '10');
+
+        const data = await fetchApi(context.baseUrl, `/api/rapoarte/utilizatori?${params}`);
+        if (!data.success) return `Eroare: ${data.details || 'Nu s-au putut căuta utilizatorii'}`;
+
+        const users = data.data || [];
+        if (users.length === 0) return `Nu am găsit niciun utilizator cu numele "${toolInput.search}".`;
+
+        let result = `Am găsit ${users.length} utilizator(i):\n\n`;
+        for (const u of users) {
+          result += `- ${u.nume_complet || `${u.prenume || ''} ${u.nume || ''}`.trim()} | UID: ${u.uid} | Email: ${u.email || '-'} | Rol: ${u.rol || '-'}\n`;
+        }
+        return result;
+      }
+
       // ==================== SARCINI ====================
       case 'list_tasks': {
         const params = new URLSearchParams();
