@@ -268,6 +268,44 @@ function calculateDurationInDays(startDate?: string | { value: string }, endDate
   }
 }
 
+// Generează textul de identificare client în funcție de tipul clientului (PJ sau PF)
+function generateClientIdentificare(client: any): string {
+  const tipClient = client?.tip_client || 'Juridic';
+  const isPersoanaFizica = tipClient === 'Fizic' || tipClient === 'persoana_fizica';
+
+  if (isPersoanaFizica) {
+    const adresa = client?.adresa || 'ADRESA NECUNOSCUTA';
+    const ciSerie = client?.ci_serie || '';
+    const ciNumar = client?.ci_numar || '';
+    const ciEliberataDe = client?.ci_eliberata_de || '';
+    const cnp = client?.cnp || '';
+    const reprezentant = client?.reprezentant || '';
+
+    let text = `persoană fizică, cu domiciliul în ${adresa}`;
+    if (ciSerie && ciNumar) {
+      text += `, identificată cu C.I. seria ${ciSerie} nr. ${ciNumar}`;
+      if (ciEliberataDe) {
+        text += `, eliberată de ${ciEliberataDe}`;
+      }
+    }
+    if (cnp) {
+      text += `, CNP ${cnp}`;
+    }
+    if (reprezentant) {
+      text += `, reprezentată prin ${reprezentant}`;
+    }
+    return text;
+  }
+
+  // Persoană juridică (default)
+  const adresa = client?.adresa || 'ADRESA NECUNOSCUTA';
+  const nrRegCom = client?.nr_reg_com || 'NR REG COM NECUNOSCUT';
+  const cui = client?.cui || 'CUI NECUNOSCUT';
+  const reprezentant = client?.reprezentant || 'Administrator';
+
+  return `persoană juridică română, cu sediul în ${adresa}, înmatriculată la Oficiul Registrului Comerțului sub nr. ${nrRegCom}, C.U.I. ${cui}, reprezentată prin ${reprezentant}`;
+}
+
 // MODIFICAT: Procesarea placeholder-urilor pentru contract cu corectare procente
 function processPlaceholders(text: string, data: any): string {
   let processed = text;
@@ -299,6 +337,7 @@ function processPlaceholders(text: string, data: any): string {
     '{{contract.data}}': data.contract?.data || new Date().toLocaleDateString('ro-RO'),
     
     // Client info
+    '{{client_identificare}}': generateClientIdentificare(data.client),
     '{{client.nume}}': data.client?.nume || data.client?.denumire || 'CLIENT NECUNOSCUT',
     '{{client.cui}}': data.client?.cui || 'CUI NECUNOSCUT',
     '{{client.nr_reg_com}}': data.client?.nr_reg_com || 'NR REG COM NECUNOSCUT',
@@ -306,14 +345,14 @@ function processPlaceholders(text: string, data: any): string {
     '{{client.telefon}}': (typeof data.client?.telefon === 'string' ? data.client.telefon : '') || '',
     '{{client.email}}': (typeof data.client?.email === 'string' ? data.client.email : '') || '',
     '{{client.reprezentant}}': data.client?.reprezentant || 'Administrator',
-    
+
     // Proiect info
     '{{proiect.denumire}}': data.proiect?.denumire || 'PROIECT NECUNOSCUT',
     '{{proiect.data_start}}': data.proiect?.data_start || 'TBD',
     '{{proiect.data_final}}': data.proiect?.data_final || 'TBD',
     '{{proiect.durata_zile}}': data.proiect?.durata_zile || 'TBD',
     '{{proiect.responsabil}}': data.proiect?.responsabil || '',
-    
+
     // Firma info
     '{{firma.nume}}': 'UNITAR PROIECT TDA SRL',
     '{{firma.cui}}': 'RO35639210',
@@ -451,6 +490,7 @@ function processAnexaPlaceholders(text: string, data: any): string {
     '{{moneda_originala}}': data.moneda_anexa_originala || 'RON',
     
     // Client info - păstrează din contract
+    '{{client_identificare}}': generateClientIdentificare(data.client),
     '{{client.nume}}': data.client?.nume || data.client?.denumire || 'CLIENT NECUNOSCUT',
     '{{client.cui}}': data.client?.cui || 'CUI NECUNOSCUT',
     '{{client.nr_reg_com}}': data.client?.nr_reg_com || 'NR REG COM NECUNOSCUT',
@@ -768,7 +808,12 @@ async function loadProiectDataSimple(proiectId: string) {
       client_telefon: clientData ? extractSimpleValue(clientData.telefon) : null,
       client_email: clientData ? extractSimpleValue(clientData.email) : null,
       client_judet: clientData ? extractSimpleValue(clientData.judet) : null,
-      client_oras: clientData ? extractSimpleValue(clientData.oras) : null
+      client_oras: clientData ? extractSimpleValue(clientData.oras) : null,
+      client_tip: clientData ? extractSimpleValue(clientData.tip_client) : null,
+      client_cnp: clientData ? extractSimpleValue(clientData.cnp) : null,
+      client_ci_serie: clientData ? extractSimpleValue(clientData.ci_serie) : null,
+      client_ci_numar: clientData ? extractSimpleValue(clientData.ci_numar) : null,
+      client_ci_eliberata_de: clientData ? extractSimpleValue(clientData.ci_eliberata_de) : null
     };
     
     const subproiecteProcessed = subproiecteRows.map((sub: any) => ({
@@ -960,9 +1005,14 @@ function prepareSimpleTemplateData(
       adresa: proiect.client_adresa || 'Adresa necunoscuta',
       telefon: proiect.client_telefon || '',
       email: proiect.client_email || '',
-      reprezentant: 'Administrator'
+      reprezentant: 'Administrator',
+      tip_client: proiect.client_tip || 'Juridic',
+      cnp: proiect.client_cnp || '',
+      ci_serie: proiect.client_ci_serie || '',
+      ci_numar: proiect.client_ci_numar || '',
+      ci_eliberata_de: proiect.client_ci_eliberata_de || ''
     },
-    
+
     proiect: {
       denumire: proiect.Denumire,
       adresa: proiect.Adresa || '',
@@ -1043,9 +1093,14 @@ function prepareAnexaTemplateData(
       adresa: proiect.client_adresa || 'Adresa necunoscuta',
       telefon: proiect.client_telefon || '',
       email: proiect.client_email || '',
-      reprezentant: 'Administrator'
+      reprezentant: 'Administrator',
+      tip_client: proiect.client_tip || 'Juridic',
+      cnp: proiect.client_cnp || '',
+      ci_serie: proiect.client_ci_serie || '',
+      ci_numar: proiect.client_ci_numar || '',
+      ci_eliberata_de: proiect.client_ci_eliberata_de || ''
     },
-    
+
     proiect: {
       denumire: proiect.Denumire,
       adresa: proiect.Adresa || '',
@@ -1110,7 +1165,7 @@ async function createFallbackTemplate(data: any): Promise<string> {
 
 **CAP.I. PĂRȚI CONTRACTANTE**
 
-1. Între {{client.nume}}, persoană juridică română, cu sediul în {{client.adresa}}, înmatriculată la Oficiul Registrului Comerțului sub nr. {{client.nr_reg_com}}, C.U.I. {{client.cui}}, reprezentată prin {{client.reprezentant}} denumită în continuare **BENEFICIAR**
+1. Între {{client.nume}}, {{client_identificare}}, denumită în continuare **BENEFICIAR**
 
 și
 
@@ -1177,7 +1232,7 @@ async function createAnexaFallbackTemplate(data: any): Promise<string> {
 
 **CAP.I. PĂRȚI CONTRACTANTE**
 
-1. Între **{{client.nume}}**, persoană juridică română, cu sediul în {{client.adresa}}, înmatriculată la Oficiul Registrului Comerțului sub nr. {{client.nr_reg_com}}, C.U.I. {{client.cui}}, reprezentată prin {{client.reprezentant}}, denumită în continuare **BENEFICIAR**
+1. Între **{{client.nume}}**, {{client_identificare}}, denumită în continuare **BENEFICIAR**
 
 și
 

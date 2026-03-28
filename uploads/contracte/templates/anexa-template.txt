@@ -2,7 +2,7 @@
 
 **CAP.I. PĂRȚI CONTRACTANTE**
 
-1. Între **{{client.nume}}**, persoană juridică română, cu sediul în {{client.adresa}}, înmatriculată la Oficiul Registrului Comerțului sub nr. {{client.nr_reg_com}}, C.U.I. {{client.cui}}, reprezentată prin {{client.reprezentant}}, denumită în continuare **BENEFICIAR**
+1. Între **{{client.nume}}**, {{client_identificare}}, denumită în continuare **BENEFICIAR**
 
 Și
 

@@ -472,7 +472,12 @@ async function loadProiectDataForPV(proiectId: string, subproiecteIds: string[] 
       client_adresa: clientData ? extractSimpleValue(clientData.adresa) : null,
       client_telefon: clientData ? extractSimpleValue(clientData.telefon) : null,
       client_email: clientData ? extractSimpleValue(clientData.email) : null,
-      client_reprezentant: clientData ? extractSimpleValue(clientData.reprezentant) : 'Administrator'
+      client_reprezentant: clientData ? extractSimpleValue(clientData.reprezentant) : 'Administrator',
+      client_tip: clientData ? extractSimpleValue(clientData.tip_client) : null,
+      client_cnp: clientData ? extractSimpleValue(clientData.cnp) : null,
+      client_ci_serie: clientData ? extractSimpleValue(clientData.ci_serie) : null,
+      client_ci_numar: clientData ? extractSimpleValue(clientData.ci_numar) : null,
+      client_ci_eliberata_de: clientData ? extractSimpleValue(clientData.ci_eliberata_de) : null
     };
     
     // MODIFICAT: Eliminare câmpuri financiare din subproiecte
@@ -532,6 +537,44 @@ function determineContractText(contractInfo: any, subproiecteIds: string[]): str
   return `LA CONTRACTUL NR. ${contract.numar_contract} din ${contract.data_semnare}`;
 }
 
+// Generează textul de identificare client în funcție de tipul clientului (PJ sau PF)
+function generateClientIdentificare(client: any): string {
+  const tipClient = client?.tip_client || 'Juridic';
+  const isPersoanaFizica = tipClient === 'Fizic' || tipClient === 'persoana_fizica';
+
+  if (isPersoanaFizica) {
+    const adresa = client?.adresa || 'ADRESA NECUNOSCUTA';
+    const ciSerie = client?.ci_serie || '';
+    const ciNumar = client?.ci_numar || '';
+    const ciEliberataDe = client?.ci_eliberata_de || '';
+    const cnp = client?.cnp || '';
+    const reprezentant = client?.reprezentant || '';
+
+    let text = `persoană fizică, cu domiciliul în ${adresa}`;
+    if (ciSerie && ciNumar) {
+      text += `, identificată cu C.I. seria ${ciSerie} nr. ${ciNumar}`;
+      if (ciEliberataDe) {
+        text += `, eliberată de ${ciEliberataDe}`;
+      }
+    }
+    if (cnp) {
+      text += `, CNP ${cnp}`;
+    }
+    if (reprezentant) {
+      text += `, reprezentată prin ${reprezentant}`;
+    }
+    return text;
+  }
+
+  // Persoană juridică (default)
+  const adresa = client?.adresa || 'ADRESA NECUNOSCUTA';
+  const nrRegCom = client?.nr_reg_com || 'NR REG COM NECUNOSCUT';
+  const cui = client?.cui || 'CUI NECUNOSCUT';
+  const reprezentant = client?.reprezentant || 'Administrator';
+
+  return `persoană juridică română, cu sediul în ${adresa}, înmatriculată la Oficiul Registrului Comerțului sub nr. ${nrRegCom}, C.U.I. ${cui}, reprezentată prin ${reprezentant}`;
+}
+
 // MODIFICAT: Procesarea placeholder-urilor pentru PV cu logica dinamică FĂRĂ referințe financiare
 function processPVPlaceholders(text: string, data: any): string {
   let processed = text;
@@ -544,6 +587,7 @@ function processPVPlaceholders(text: string, data: any): string {
     '{{pv.numar_exemplare}}': data.pv?.numar_exemplare || '3',
     
     // Client info
+    '{{client_identificare}}': generateClientIdentificare(data.client),
     '{{client.nume}}': data.client?.nume || data.client?.denumire || 'CLIENT NECUNOSCUT',
     '{{client.cui}}': data.client?.cui || 'CUI NECUNOSCUT',
     '{{client.nr_reg_com}}': data.client?.nr_reg_com || 'NR REG COM NECUNOSCUT',
@@ -775,7 +819,7 @@ async function createPVFallbackTemplate(data: any): Promise<string> {
 
 Și
 
-**{{client.nume}}**, persoană juridică română, cu sediul în {{client.adresa}}, înmatriculată la Oficiul Registrului Comerțului sub nr. {{client.nr_reg_com}}, C.U.I. {{client.cui}}, reprezentată prin {{client.reprezentant}}, denumită în continuare **BENEFICIAR**
+**{{client.nume}}**, {{client_identificare}}, denumită în continuare **BENEFICIAR**
 
 Prin prezenta se confirmă că am predat / am primit în {{pv.numar_exemplare}} exemplare din **{{proiect.denumire}}** {{proiect.adresa}} {{subproiecte_lista}}.
 
@@ -838,7 +882,12 @@ function preparePVTemplateData(
       adresa: proiect.client_adresa || 'Adresa necunoscuta',
       telefon: proiect.client_telefon || '',
       email: proiect.client_email || '',
-      reprezentant: proiect.client_reprezentant || 'Administrator'
+      reprezentant: proiect.client_reprezentant || 'Administrator',
+      tip_client: proiect.client_tip || 'Juridic',
+      cnp: proiect.client_cnp || '',
+      ci_serie: proiect.client_ci_serie || '',
+      ci_numar: proiect.client_ci_numar || '',
+      ci_eliberata_de: proiect.client_ci_eliberata_de || ''
     },
     
     proiect: {
