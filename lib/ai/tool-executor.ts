@@ -966,6 +966,57 @@ export async function executeTool(
         return `Reminder setat pentru ${formatDate(toolInput.reminder_data)}: "${toolInput.continut}" (ID: ${data.memoryId}).`;
       }
 
+      // ==================== TRIGGERS AI ====================
+      case 'list_active_triggers': {
+        const params = new URLSearchParams();
+        params.set('user_id', context.userId);
+        params.set('status', toolInput.status || 'all');
+        params.set('limit', String(toolInput.limit || 10));
+
+        const data = await fetchApi(context.baseUrl, `/api/ai/triggers?${params}`);
+        if (!data.success) return `Eroare: ${data.error || 'Nu s-au putut obține sugestiile'}`;
+
+        const triggers = data.triggers || [];
+        if (triggers.length === 0) return 'Nu sunt sugestii proactive pendinte.';
+
+        const priorityEmoji: Record<number, string> = { 10: '🔴', 9: '🔴', 8: '🟠', 7: '🟡', 6: '🟡' };
+        let result = `Ai ${triggers.length} sugestii proactive:\n\n`;
+        for (const t of triggers) {
+          const emoji = priorityEmoji[t.prioritate] || '🔵';
+          result += `- ${emoji} [${t.id}] ${t.mesaj_utilizator}\n`;
+          if (t.actiune_sugerata) result += `  Acțiune posibilă: ${t.actiune_sugerata}\n`;
+          if (t.entity_id) result += `  Entitate: ${t.entity_type || '-'} ${t.entity_id}\n`;
+          result += '\n';
+        }
+        result += 'Răspunde cu "acceptă", "refuză" sau "amână" pentru fiecare sugestie.';
+        return result;
+      }
+
+      case 'respond_to_trigger': {
+        const body: any = {
+          id: toolInput.trigger_id,
+          status: toolInput.raspuns,
+        };
+        if (toolInput.observatii) body.raspuns_utilizator = toolInput.observatii;
+        if (toolInput.raspuns === 'amanat' && toolInput.amanat_pana_la) {
+          body.amanat_pana_la = toolInput.amanat_pana_la;
+        }
+
+        const data = await fetchApi(context.baseUrl, '/api/ai/triggers', {
+          method: 'PUT',
+          body: JSON.stringify(body)
+        });
+
+        if (!data.success) return `Eroare: ${data.error || 'Nu s-a putut actualiza sugestia'}`;
+
+        const raspunsLabels: Record<string, string> = {
+          acceptat: '✅ Sugestie acceptată',
+          refuzat: '❌ Sugestie refuzată',
+          amanat: `⏰ Sugestie amânată${toolInput.amanat_pana_la ? ` până la ${formatDate(toolInput.amanat_pana_la)}` : ''}`
+        };
+        return raspunsLabels[toolInput.raspuns] || 'Sugestie actualizată.';
+      }
+
       default:
         return `Tool necunoscut: ${toolName}`;
     }

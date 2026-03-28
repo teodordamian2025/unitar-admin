@@ -69,6 +69,29 @@ jobs:
             exit 1
           fi
 
+      - name: Trigger AI Proactive Cron - Triggers & Reminders
+        run: |
+          echo ""
+          echo "🤖 Triggering AI triggers cron - remindere, sugestii proactive..."
+
+          ai_response=$(curl -s -w "\n%{http_code}" -X GET \
+            "https://admin.unitarproiect.eu/api/ai/triggers/cron" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}")
+
+          ai_http_code=$(echo "$ai_response" | tail -n1)
+          ai_body=$(echo "$ai_response" | sed '$d')
+
+          echo "📊 AI Triggers HTTP Status: $ai_http_code"
+
+          if [ "$ai_http_code" -eq 200 ]; then
+            echo "✅ AI Triggers cron completed successfully"
+            echo "$ai_body" | python3 -m json.tool 2>/dev/null || echo "$ai_body"
+          else
+            echo "⚠️ AI Triggers cron returned status $ai_http_code (non-blocking)"
+            echo "$ai_body"
+          fi
+
       - name: Health Check Summary
         if: always()
         run: |

@@ -10,7 +10,23 @@ export type MemoryContext = {
   tags?: string;
 };
 
-export function getSystemPrompt(userRole: string, userName: string, memories?: MemoryContext[]): string {
+// Tipul pentru un trigger injectat în context
+export type TriggerContext = {
+  id: string;
+  mesaj_utilizator: string;
+  actiune_sugerata: string;
+  entity_type?: string;
+  entity_id?: string;
+  entity_name?: string;
+  prioritate: number;
+};
+
+export function getSystemPrompt(
+  userRole: string,
+  userName: string,
+  memories?: MemoryContext[],
+  triggers?: TriggerContext[]
+): string {
   const roleDescription = userRole === 'admin'
     ? 'Administrator - acces complet la toate datele și acțiunile'
     : 'Utilizator normal - acces la proiecte, sarcini, timp lucrat, comentarii';
@@ -76,6 +92,15 @@ MEMORIE PERSISTENTĂ:
 - La începutul conversației verifici dacă există remindere active sau note relevante
 - Folosește recall_memory când ai nevoie de context din conversații anterioare
 
+REACȚII PROACTIVE (TRIGGERS):
+- Sistemul generează automat sugestii când detectează situații importante (proiect finalizat fără PV/factură, facturi neachitate, etc.)
+- La începutul conversației, dacă există triggers active, menționează-le NATURAL utilizatorului
+- Exemplu: "Bună! Am observat că proiectul X a fost finalizat dar nu are încă PV și factură. Vrei să le generăm?"
+- Când utilizatorul acceptă o sugestie, execută acțiunea corespunzătoare (cu confirmare standard)
+- Când refuză, marchează triggerul ca refuzat
+- Când zice "nu acum" sau "mai târziu", amână triggerul (cere data de amânare)
+- NU fi insistent - dacă utilizatorul refuză, nu re-propune aceeași sugestie
+
 FORMATARE RĂSPUNSURI:
 - Pentru liste: folosește numerotare (1., 2., 3.)
 - Pentru status: pune emoji-ul corespunzător înainte
@@ -90,6 +115,15 @@ ${memories.map(m => {
   let line = `${emoji} [${m.tip_memorie}] ${m.continut}`;
   if (m.entity_type && m.entity_id) line += ` (${m.entity_type}: ${m.entity_id})`;
   if (m.reminder_data) line += ` [reminder: ${m.reminder_data}]`;
+  return line;
+}).join('\n')}` : ''}${triggers && triggers.length > 0 ? `
+
+SUGESTII PROACTIVE ACTIVE (triggers - menționează-le utilizatorului la începutul conversației):
+${triggers.map(t => {
+  const priorityEmoji: Record<number, string> = { 10: '🔴', 9: '🔴', 8: '🟠', 7: '🟡', 6: '🟡' };
+  const emoji = priorityEmoji[t.prioritate] || '🔵';
+  let line = `${emoji} [ID: ${t.id}] ${t.mesaj_utilizator}`;
+  if (t.actiune_sugerata) line += ` → Acțiune: ${t.actiune_sugerata}`;
   return line;
 }).join('\n')}` : ''}`;
 }

@@ -4,7 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { ChatSession } from '@/lib/ai/types';
-import { getSystemPrompt, MemoryContext } from '@/lib/ai/system-prompt';
+import { getSystemPrompt, MemoryContext, TriggerContext } from '@/lib/ai/system-prompt';
 import { getAnthropicTools } from '@/lib/ai/tools';
 import { executeTool } from '@/lib/ai/tool-executor';
 
@@ -57,6 +57,29 @@ async function fetchMemoryContext(baseUrl: string, userId: string): Promise<Memo
   } catch (error) {
     // Memory fetch e optional - nu bloca conversația
     console.warn('⚠️ Nu s-au putut încărca memoriile:', error);
+    return [];
+  }
+}
+
+// Fetch triggers active pentru context injection
+async function fetchTriggerContext(baseUrl: string, userId: string): Promise<TriggerContext[]> {
+  try {
+    const res = await fetch(`${baseUrl}/api/ai/triggers?user_id=${userId}&status=all&limit=5`);
+    const data = await res.json();
+
+    if (!data.success || !data.triggers) return [];
+
+    return data.triggers.map((t: any) => ({
+      id: t.id,
+      mesaj_utilizator: t.mesaj_utilizator,
+      actiune_sugerata: t.actiune_sugerata,
+      entity_type: t.entity_type,
+      entity_id: t.entity_id,
+      entity_name: t.entity_name,
+      prioritate: t.prioritate || 5,
+    }));
+  } catch (error) {
+    console.warn('⚠️ Nu s-au putut încărca triggers:', error);
     return [];
   }
 }
@@ -143,12 +166,22 @@ export async function POST(request: NextRequest) {
     // Pregătește tools-urile bazate pe rol
     const tools = getAnthropicTools(role);
 
-    // Fetch memorii relevante pentru context injection (doar la primul mesaj din sesiune sau la fiecare 5 mesaje)
+    // Fetch memorii + triggers pentru context injection (la primul mesaj sau periodic)
     let memories: MemoryContext[] = [];
+    let triggers: TriggerContext[] = [];
     if (session.messages.length <= 2 || session.messages.length % 10 === 0) {
-      memories = await fetchMemoryContext(baseUrl, userId);
+      const [mem, trig] = await Promise.all([
+        fetchMemoryContext(baseUrl, userId),
+        role === 'admin' ? fetchTriggerContext(baseUrl, userId) : Promise.resolve([]),
+      ]);
+      memories = mem;
+      triggers = trig;
     }
-    const systemPrompt = getSystemPrompt(role, name, memories.length > 0 ? memories : undefined);
+    const systemPrompt = getSystemPrompt(
+      role, name,
+      memories.length > 0 ? memories : undefined,
+      triggers.length > 0 ? triggers : undefined
+    );
 
     // Apelează Claude Haiku
     let response = await anthropic.messages.create({

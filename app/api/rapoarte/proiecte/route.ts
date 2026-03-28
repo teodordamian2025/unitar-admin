@@ -1011,6 +1011,103 @@ export async function PUT(request: NextRequest) {
 
     console.log('=== DEBUG PUT: Update completat cu succes ===');
 
+    // ==================== AI TRIGGERS: Reacții proactive la schimbări status ====================
+    // Non-blocking - erori aici nu afectează update-ul
+    try {
+      const proiectInfo = checkAfterRows[0];
+      const newStatus = status || updateData?.Status;
+      const newStatusPredare = updateData?.status_predare;
+      const newStatusFacturare = updateData?.status_facturare;
+
+      // Construiește baseUrl
+      const fwdHost = request.headers.get('x-forwarded-host');
+      const fwdProto = request.headers.get('x-forwarded-proto') || 'https';
+      const reqHost = request.headers.get('host');
+      const triggerBaseUrl = fwdHost
+        ? `${fwdProto}://${fwdHost}`
+        : reqHost
+          ? `${reqHost.includes('localhost') ? 'http' : 'https'}://${reqHost}`
+          : process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+
+      // Trigger: Proiect finalizat → sugerează PV + facturare
+      if (newStatus && ['Incheiat', 'Finalizat'].includes(newStatus)) {
+        const responsabilNume = proiectInfo?.Responsabil || updateData?.Responsabil;
+        if (responsabilNume) {
+          // Caută UID responsabil
+          const [userRows] = await bigquery.query({
+            query: `SELECT uid FROM \`${PROJECT_ID}.${dataset.replace('Proiecte_v2', 'Utilizatori_v2').replace(dataset, 'PanouControlUnitar')}.Utilizatori_v2\`
+                    WHERE LOWER(CONCAT(IFNULL(prenume,''), ' ', IFNULL(nume,''))) LIKE LOWER(@search)
+                       OR LOWER(CONCAT(IFNULL(nume,''), ' ', IFNULL(prenume,''))) LIKE LOWER(@search)
+                    LIMIT 1`,
+            params: { search: `%${responsabilNume}%` },
+          });
+          const responsabilUID = userRows?.[0]?.uid;
+
+          if (responsabilUID) {
+            // Creează trigger pentru PV
+            await fetch(`${triggerBaseUrl}/api/ai/triggers`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                tip_trigger: 'status_change',
+                eveniment: 'proiect_finalizat',
+                actiune_sugerata: 'genereaza_pv_si_factura',
+                mesaj_utilizator: `🎉 Proiectul "${proiectInfo?.Denumire || id}" a fost marcat ca ${newStatus}. Vrei să generez Procesul Verbal de predare și factura?`,
+                user_id: responsabilUID,
+                entity_type: 'proiect',
+                entity_id: id,
+                entity_name: proiectInfo?.Denumire || '',
+                prioritate: 8,
+                context_json: { client: proiectInfo?.Client, status: newStatus },
+                creat_de: 'system',
+              }),
+            });
+            console.log('✅ AI Trigger creat: proiect_finalizat pentru', id);
+          }
+        }
+      }
+
+      // Trigger: Proiect predat dar nefacturat
+      if (newStatusPredare === 'Predat' && (!newStatusFacturare || newStatusFacturare === 'Nefacturat')) {
+        const responsabilNume = proiectInfo?.Responsabil || updateData?.Responsabil;
+        if (responsabilNume) {
+          const [userRows] = await bigquery.query({
+            query: `SELECT uid FROM \`${PROJECT_ID}.PanouControlUnitar.Utilizatori_v2\`
+                    WHERE LOWER(CONCAT(IFNULL(prenume,''), ' ', IFNULL(nume,''))) LIKE LOWER(@search)
+                       OR LOWER(CONCAT(IFNULL(nume,''), ' ', IFNULL(prenume,''))) LIKE LOWER(@search)
+                    LIMIT 1`,
+            params: { search: `%${responsabilNume}%` },
+          });
+          const responsabilUID = userRows?.[0]?.uid;
+
+          if (responsabilUID) {
+            await fetch(`${triggerBaseUrl}/api/ai/triggers`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                tip_trigger: 'status_change',
+                eveniment: 'proiect_predat_nefacturat',
+                actiune_sugerata: 'genereaza_factura',
+                mesaj_utilizator: `📋 Proiectul "${proiectInfo?.Denumire || id}" a fost predat. Vrei să generez factura?`,
+                user_id: responsabilUID,
+                entity_type: 'proiect',
+                entity_id: id,
+                entity_name: proiectInfo?.Denumire || '',
+                prioritate: 7,
+                context_json: { client: proiectInfo?.Client },
+                creat_de: 'system',
+              }),
+            });
+            console.log('✅ AI Trigger creat: proiect_predat_nefacturat pentru', id);
+          }
+        }
+      }
+    } catch (triggerError) {
+      // Non-blocking - nu afectează update-ul
+      console.warn('⚠️ AI Trigger hook error (non-blocking):', triggerError);
+    }
+    // ==================== END AI TRIGGERS ====================
+
     return NextResponse.json({
       success: true,
       message: 'Proiect actualizat cu succes'

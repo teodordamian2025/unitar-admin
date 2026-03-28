@@ -913,6 +913,55 @@ const allTools: ToolDefinition[] = [
       },
       required: ['continut', 'reminder_data']
     }
+  },
+
+  // ==================== TRIGGERS AI (ADMIN) ====================
+  {
+    name: 'list_active_triggers',
+    description: 'Listează sugestiile proactive (triggers) active pentru utilizatorul curent. Triggerele sunt sugestii automate generate de sistem când: un proiect e finalizat și lipsește PV/factură, un termen se apropie, o factură e scadentă, etc. Folosește la începutul conversației pentru a verifica dacă sunt sugestii pendinte.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        status: {
+          type: 'string',
+          enum: ['activ', 'afisat', 'all'],
+          description: 'Filtru status (default: "all" - active + afișate + amânate scadente)'
+        },
+        limit: {
+          type: 'number',
+          description: 'Numărul maxim de rezultate (default: 10)'
+        }
+      }
+    },
+    adminOnly: true
+  },
+  {
+    name: 'respond_to_trigger',
+    description: 'Răspunde la un trigger/sugestie proactivă. Folosește acest tool când utilizatorul acceptă sau refuză o sugestie a AI-ului (de ex: "da, generează factura" sau "nu, nu acum, amintește-mi săptămâna viitoare").',
+    input_schema: {
+      type: 'object',
+      properties: {
+        trigger_id: {
+          type: 'string',
+          description: 'ID-ul triggerului (din list_active_triggers)'
+        },
+        raspuns: {
+          type: 'string',
+          enum: ['acceptat', 'refuzat', 'amanat'],
+          description: 'Răspunsul: "acceptat" (execută acțiunea), "refuzat" (ignoră), "amanat" (reamintește mai târziu)'
+        },
+        amanat_pana_la: {
+          type: 'string',
+          description: 'Data amânare în format YYYY-MM-DD (obligatoriu dacă răspuns="amanat")'
+        },
+        observatii: {
+          type: 'string',
+          description: 'Observații opționale ale utilizatorului'
+        }
+      },
+      required: ['trigger_id', 'raspuns']
+    },
+    adminOnly: true
   }
 ];
 
