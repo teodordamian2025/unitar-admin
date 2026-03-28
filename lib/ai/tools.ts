@@ -809,6 +809,110 @@ const allTools: ToolDefinition[] = [
       }
     },
     adminOnly: true
+  },
+
+  // ==================== MEMORIE AI ====================
+  {
+    name: 'save_memory',
+    description: 'Salvează o informație în memoria permanentă. Folosește acest tool pentru a reține informații importante despre utilizator, proiecte, decizii luate, preferințe, sau orice altceva ce ar fi util în conversațiile viitoare. Memoria persistă între sesiuni și se resetează la Vercel cold start. Tipuri: "nota" (informații generale), "decizie" (decizii luate), "preferinta" (preferințe utilizator), "reminder" (amintire la o dată viitoare), "context" (context proiect/sarcină).',
+    input_schema: {
+      type: 'object',
+      properties: {
+        tip_memorie: {
+          type: 'string',
+          enum: ['nota', 'decizie', 'preferinta', 'reminder', 'context'],
+          description: 'Tipul memoriei'
+        },
+        continut: {
+          type: 'string',
+          description: 'Conținutul memoriei - informația de reținut'
+        },
+        entity_type: {
+          type: 'string',
+          enum: ['proiect', 'client', 'contract', 'sarcina', 'general'],
+          description: 'Tipul entității asociate (opțional)'
+        },
+        entity_id: {
+          type: 'string',
+          description: 'ID-ul entității asociate, ex: "P2025001" (opțional)'
+        },
+        tags: {
+          type: 'string',
+          description: 'Taguri separate prin virgulă pentru căutare ușoară (opțional, ex: "facturare,urgent,client-ABC")'
+        },
+        prioritate: {
+          type: 'number',
+          description: 'Prioritate 1-10 (10=cea mai importantă, default: 5)'
+        },
+        reminder_data: {
+          type: 'string',
+          description: 'Data reminder în format YYYY-MM-DD (obligatoriu dacă tip_memorie="reminder")'
+        }
+      },
+      required: ['tip_memorie', 'continut']
+    }
+  },
+  {
+    name: 'recall_memory',
+    description: 'Caută în memoria permanentă informații salvate anterior. Folosește acest tool când ai nevoie de context din conversații anterioare, preferințe salvate ale utilizatorului, sau note despre proiecte/clienți. Caută automat și în notele globale.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        search: {
+          type: 'string',
+          description: 'Termen de căutare în conținut și taguri'
+        },
+        entity_type: {
+          type: 'string',
+          enum: ['proiect', 'client', 'contract', 'sarcina', 'general'],
+          description: 'Filtrare pe tip entitate'
+        },
+        entity_id: {
+          type: 'string',
+          description: 'Filtrare pe ID entitate specifică'
+        },
+        tip_memorie: {
+          type: 'string',
+          enum: ['nota', 'decizie', 'preferinta', 'reminder', 'context'],
+          description: 'Filtrare pe tip memorie'
+        },
+        limit: {
+          type: 'number',
+          description: 'Numărul maxim de rezultate (default: 10)'
+        }
+      }
+    }
+  },
+  {
+    name: 'set_reminder',
+    description: 'Setează un reminder pentru o dată viitoare. Când data vine, AI-ul va aminti utilizatorului. Folosește acest tool când utilizatorul zice "amintește-mi", "reamintește-mi", "reminder pentru", sau când o acțiune trebuie amânată.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        continut: {
+          type: 'string',
+          description: 'Ce trebuie amintit (obligatoriu)'
+        },
+        reminder_data: {
+          type: 'string',
+          description: 'Data la care să amintească, format YYYY-MM-DD (obligatoriu)'
+        },
+        entity_type: {
+          type: 'string',
+          enum: ['proiect', 'client', 'contract', 'sarcina', 'general'],
+          description: 'Tipul entității asociate (opțional)'
+        },
+        entity_id: {
+          type: 'string',
+          description: 'ID-ul entității asociate (opțional)'
+        },
+        prioritate: {
+          type: 'number',
+          description: 'Prioritate 1-10 (default: 7 pentru remindere)'
+        }
+      },
+      required: ['continut', 'reminder_data']
+    }
   }
 ];
 

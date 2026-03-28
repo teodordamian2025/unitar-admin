@@ -4,9 +4,62 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { ChatSession } from '@/lib/ai/types';
-import { getSystemPrompt } from '@/lib/ai/system-prompt';
+import { getSystemPrompt, MemoryContext } from '@/lib/ai/system-prompt';
 import { getAnthropicTools } from '@/lib/ai/tools';
 import { executeTool } from '@/lib/ai/tool-executor';
+
+// Fetch memorii relevante pentru context injection
+async function fetchMemoryContext(baseUrl: string, userId: string): Promise<MemoryContext[]> {
+  try {
+    // Fetch note recente + remindere active (în paralel)
+    const [notesRes, remindersRes] = await Promise.all([
+      fetch(`${baseUrl}/api/ai/memory?user_id=${userId}&limit=15`),
+      fetch(`${baseUrl}/api/ai/memory?user_id=${userId}&reminders_only=true&limit=5`),
+    ]);
+
+    const notesData = await notesRes.json();
+    const remindersData = await remindersRes.json();
+
+    const memories: MemoryContext[] = [];
+
+    // Adaugă remindere active (prioritate maximă)
+    if (remindersData.success && remindersData.memories) {
+      for (const m of remindersData.memories) {
+        memories.push({
+          tip_memorie: 'reminder',
+          continut: m.continut,
+          entity_type: m.entity_type,
+          entity_id: m.entity_id,
+          reminder_data: m.reminder_data,
+          tags: m.tags,
+        });
+      }
+    }
+
+    // Adaugă note recente (fără duplicare cu remindere)
+    const reminderIds = new Set(remindersData.memories?.map((m: any) => m.id) || []);
+    if (notesData.success && notesData.memories) {
+      for (const m of notesData.memories) {
+        if (reminderIds.has(m.id)) continue;
+        if (memories.length >= 15) break;
+        memories.push({
+          tip_memorie: m.tip_memorie,
+          continut: m.continut,
+          entity_type: m.entity_type,
+          entity_id: m.entity_id,
+          reminder_data: m.reminder_data,
+          tags: m.tags,
+        });
+      }
+    }
+
+    return memories;
+  } catch (error) {
+    // Memory fetch e optional - nu bloca conversația
+    console.warn('⚠️ Nu s-au putut încărca memoriile:', error);
+    return [];
+  }
+}
 
 // Sesiuni in-memory (se resetează la cold start pe Vercel - acceptabil pentru MVP)
 const sessions = new Map<string, ChatSession>();
@@ -90,11 +143,18 @@ export async function POST(request: NextRequest) {
     // Pregătește tools-urile bazate pe rol
     const tools = getAnthropicTools(role);
 
+    // Fetch memorii relevante pentru context injection (doar la primul mesaj din sesiune sau la fiecare 5 mesaje)
+    let memories: MemoryContext[] = [];
+    if (session.messages.length <= 2 || session.messages.length % 10 === 0) {
+      memories = await fetchMemoryContext(baseUrl, userId);
+    }
+    const systemPrompt = getSystemPrompt(role, name, memories.length > 0 ? memories : undefined);
+
     // Apelează Claude Haiku
     let response = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 2048,
-      system: getSystemPrompt(role, name),
+      system: systemPrompt,
       tools,
       messages: session.messages.map(m => ({
         role: m.role as 'user' | 'assistant',
@@ -149,7 +209,7 @@ export async function POST(request: NextRequest) {
       response = await anthropic.messages.create({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 2048,
-        system: getSystemPrompt(role, name),
+        system: systemPrompt,
         tools,
         messages: session.messages.map(m => ({
           role: m.role as 'user' | 'assistant',

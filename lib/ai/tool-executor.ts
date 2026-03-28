@@ -872,6 +872,100 @@ export async function executeTool(
         return result;
       }
 
+      // ==================== MEMORIE AI ====================
+      case 'save_memory': {
+        const body: any = {
+          user_id: context.userId,
+          tip_memorie: toolInput.tip_memorie,
+          continut: toolInput.continut,
+          entity_type: toolInput.entity_type || null,
+          entity_id: toolInput.entity_id || null,
+          tags: toolInput.tags || null,
+          prioritate: toolInput.prioritate || 5,
+          creat_de: 'ai_agent'
+        };
+        if (toolInput.reminder_data) body.reminder_data = toolInput.reminder_data;
+
+        const data = await fetchApi(context.baseUrl, '/api/ai/memory', {
+          method: 'POST',
+          body: JSON.stringify(body)
+        });
+
+        if (!data.success) return `Eroare la salvare memorie: ${data.error || 'Necunoscută'}`;
+
+        const tipLabel: Record<string, string> = {
+          nota: 'Notă',
+          decizie: 'Decizie',
+          preferinta: 'Preferință',
+          reminder: 'Reminder',
+          context: 'Context'
+        };
+        let result = `${tipLabel[toolInput.tip_memorie] || 'Memorie'} salvată cu succes (ID: ${data.memoryId}).`;
+        if (toolInput.tip_memorie === 'reminder') {
+          result += ` Voi aminti pe ${formatDate(toolInput.reminder_data)}.`;
+        }
+        return result;
+      }
+
+      case 'recall_memory': {
+        const params = new URLSearchParams();
+        params.set('user_id', context.userId);
+        if (toolInput.search) params.set('search', toolInput.search);
+        if (toolInput.entity_type) params.set('entity_type', toolInput.entity_type);
+        if (toolInput.entity_id) params.set('entity_id', toolInput.entity_id);
+        if (toolInput.tip_memorie) params.set('tip_memorie', toolInput.tip_memorie);
+        params.set('limit', String(toolInput.limit || 10));
+
+        const data = await fetchApi(context.baseUrl, `/api/ai/memory?${params}`);
+
+        if (!data.success) return `Eroare la citire memorie: ${data.error || 'Necunoscută'}`;
+
+        const memories = data.memories || [];
+        if (memories.length === 0) return 'Nu am găsit note sau informații salvate cu aceste criterii.';
+
+        const tipEmoji: Record<string, string> = {
+          nota: '📝',
+          decizie: '🔷',
+          preferinta: '⭐',
+          reminder: '⏰',
+          context: '📌'
+        };
+
+        let result = `Am găsit ${memories.length} informații salvate:\n\n`;
+        for (const m of memories) {
+          const emoji = tipEmoji[m.tip_memorie] || '📋';
+          const date = m.creat_la ? formatDate(m.creat_la) : '-';
+          result += `- ${emoji} [${m.tip_memorie}] ${m.continut}`;
+          if (m.entity_type && m.entity_id) result += ` (${m.entity_type}: ${m.entity_id})`;
+          if (m.tags) result += ` | Tags: ${m.tags}`;
+          if (m.reminder_data) result += ` | Reminder: ${formatDate(m.reminder_data)}`;
+          result += ` | Salvat: ${date}\n`;
+        }
+        return result;
+      }
+
+      case 'set_reminder': {
+        const body = {
+          user_id: context.userId,
+          tip_memorie: 'reminder',
+          continut: toolInput.continut,
+          entity_type: toolInput.entity_type || null,
+          entity_id: toolInput.entity_id || null,
+          reminder_data: toolInput.reminder_data,
+          prioritate: toolInput.prioritate || 7,
+          tags: 'reminder',
+          creat_de: 'ai_agent'
+        };
+
+        const data = await fetchApi(context.baseUrl, '/api/ai/memory', {
+          method: 'POST',
+          body: JSON.stringify(body)
+        });
+
+        if (!data.success) return `Eroare la setare reminder: ${data.error || 'Necunoscută'}`;
+        return `Reminder setat pentru ${formatDate(toolInput.reminder_data)}: "${toolInput.continut}" (ID: ${data.memoryId}).`;
+      }
+
       default:
         return `Tool necunoscut: ${toolName}`;
     }

@@ -1,6 +1,16 @@
 // lib/ai/system-prompt.ts
 
-export function getSystemPrompt(userRole: string, userName: string): string {
+// Tipul pentru o memorie injectată în context
+export type MemoryContext = {
+  tip_memorie: string;
+  continut: string;
+  entity_type?: string;
+  entity_id?: string;
+  reminder_data?: string;
+  tags?: string;
+};
+
+export function getSystemPrompt(userRole: string, userName: string, memories?: MemoryContext[]): string {
   const roleDescription = userRole === 'admin'
     ? 'Administrator - acces complet la toate datele și acțiunile'
     : 'Utilizator normal - acces la proiecte, sarcini, timp lucrat, comentarii';
@@ -59,10 +69,27 @@ EMAIL:
 
 ${roleInstructions}
 
+MEMORIE PERSISTENTĂ:
+- Ai acces la tool-urile save_memory, recall_memory și set_reminder
+- Salvează PROACTIV informații importante: decizii luate, preferințe exprimate, context relevant
+- Când utilizatorul menționează preferințe sau decizii ("vreau mereu...", "data viitoare...", "amintește-mi"), salvează automat
+- La începutul conversației verifici dacă există remindere active sau note relevante
+- Folosește recall_memory când ai nevoie de context din conversații anterioare
+
 FORMATARE RĂSPUNSURI:
 - Pentru liste: folosește numerotare (1., 2., 3.)
 - Pentru status: pune emoji-ul corespunzător înainte
 - Pentru proiecte: menționează ID-ul, denumirea și statusul
 - Pentru sarcini: menționează titlul, prioritatea și termenul
-- Păstrează răspunsurile concise - nu repeta informații inutile`;
+- Păstrează răspunsurile concise - nu repeta informații inutile${memories && memories.length > 0 ? `
+
+CONTEXT DIN MEMORIE (informații salvate din conversații anterioare):
+${memories.map(m => {
+  const tipEmoji: Record<string, string> = { nota: '📝', decizie: '🔷', preferinta: '⭐', reminder: '⏰', context: '📌' };
+  const emoji = tipEmoji[m.tip_memorie] || '📋';
+  let line = `${emoji} [${m.tip_memorie}] ${m.continut}`;
+  if (m.entity_type && m.entity_id) line += ` (${m.entity_type}: ${m.entity_id})`;
+  if (m.reminder_data) line += ` [reminder: ${m.reminder_data}]`;
+  return line;
+}).join('\n')}` : ''}`;
 }
