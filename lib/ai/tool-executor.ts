@@ -374,6 +374,282 @@ export async function executeTool(
         return `Am marcat ${toolInput.notification_ids.length} notificări ca citite.`;
       }
 
+      // ==================== CLIENȚI (ADMIN) ====================
+      case 'search_clients': {
+        const params = new URLSearchParams();
+        if (toolInput.search) params.set('search', toolInput.search);
+        if (toolInput.tip_client) params.set('tip_client', toolInput.tip_client);
+        params.set('limit', String(toolInput.limit || 20));
+
+        const data = await fetchApi(context.baseUrl, `/api/rapoarte/clienti?${params}`);
+        if (!data.success) return `Eroare: ${data.details || 'Nu s-au putut obține clienții'}`;
+
+        const clienti = data.data || [];
+        if (clienti.length === 0) return 'Nu am găsit clienți cu aceste criterii.';
+
+        let result = `Am găsit ${clienti.length} clienți:\n\n`;
+        for (const c of clienti) {
+          const tip = c.tip_client === 'Fizic' ? 'PF' : 'PJ';
+          result += `- [${c.id}] ${c.nume} | Tip: ${tip}`;
+          if (c.cui) result += ` | CUI: ${c.cui}`;
+          if (c.cnp) result += ` | CNP: ${c.cnp}`;
+          if (c.email) result += ` | Email: ${c.email}`;
+          if (c.telefon) result += ` | Tel: ${c.telefon}`;
+          if (c.iban) result += ` | IBAN: ${c.iban}`;
+          if (c.adresa) result += ` | Adresă: ${c.adresa}`;
+          result += '\n';
+        }
+        return result;
+      }
+
+      case 'create_client': {
+        const body: any = {
+          nume: toolInput.nume,
+          tip_client: toolInput.tip_client || 'Juridic',
+          activ: true
+        };
+        if (toolInput.cui) body.cui = toolInput.cui;
+        if (toolInput.cnp) body.cnp = toolInput.cnp;
+        if (toolInput.email) body.email = toolInput.email;
+        if (toolInput.telefon) body.telefon = toolInput.telefon;
+        if (toolInput.adresa) body.adresa = toolInput.adresa;
+        if (toolInput.oras) body.oras = toolInput.oras;
+        if (toolInput.judet) body.judet = toolInput.judet;
+        if (toolInput.banca) body.banca = toolInput.banca;
+        if (toolInput.iban) body.iban = toolInput.iban;
+        if (toolInput.nr_reg_com) body.nr_reg_com = toolInput.nr_reg_com;
+        if (toolInput.observatii) body.observatii = toolInput.observatii;
+
+        const data = await fetchApi(context.baseUrl, '/api/rapoarte/clienti', {
+          method: 'POST',
+          body: JSON.stringify(body)
+        });
+
+        if (!data.success) return `Eroare la creare client: ${data.error || data.details || 'Necunoscută'}`;
+        return `Clientul "${toolInput.nume}" a fost creat cu succes (ID: ${data.clientId}).`;
+      }
+
+      case 'update_client': {
+        const body: any = { id: toolInput.id };
+        const updateFields = ['nume', 'email', 'telefon', 'adresa', 'oras', 'judet', 'banca', 'iban', 'observatii'];
+        for (const field of updateFields) {
+          if (toolInput[field] !== undefined) body[field] = toolInput[field];
+        }
+
+        const data = await fetchApi(context.baseUrl, '/api/rapoarte/clienti', {
+          method: 'PUT',
+          body: JSON.stringify(body)
+        });
+
+        if (!data.success) return `Eroare la actualizare client: ${data.error || data.details || 'Necunoscută'}`;
+        let result = `Clientul ${toolInput.id} a fost actualizat cu succes.`;
+        const changes = Object.keys(body).filter(k => k !== 'id');
+        if (changes.length > 0) result += ` Câmpuri modificate: ${changes.join(', ')}.`;
+        return result;
+      }
+
+      // ==================== CONTRACTE (ADMIN) ====================
+      case 'list_contracts': {
+        const params = new URLSearchParams();
+        if (toolInput.proiect_id) params.set('proiect_id', toolInput.proiect_id);
+        if (toolInput.search) params.set('search', toolInput.search);
+        if (toolInput.status) params.set('status', toolInput.status);
+        params.set('limit', String(toolInput.limit || 20));
+
+        const data = await fetchApi(context.baseUrl, `/api/rapoarte/contracte?${params}`);
+        if (!data.success) return `Eroare: ${data.details || 'Nu s-au putut obține contractele'}`;
+
+        const contracte = data.data || [];
+        if (contracte.length === 0) return 'Nu am găsit contracte cu aceste criterii.';
+
+        let result = `Am găsit ${contracte.length} contracte:\n\n`;
+        for (const c of contracte) {
+          const valoare = c.Valoare ? formatNumber(c.Valoare) : '-';
+          const moneda = c.Moneda || 'RON';
+          result += `- [${c.ID_Contract}] Nr: ${c.numar_contract || '-'} | Proiect: ${c.proiect_denumire || c.proiect_id || '-'} | Client: ${c.client_nume || '-'} | Valoare: ${valoare} ${moneda} | Data: ${formatDate(c.data_contract)}`;
+          if (c.etape && Array.isArray(c.etape)) result += ` | ${c.etape.length} etape`;
+          result += '\n';
+        }
+        return result;
+      }
+
+      case 'generate_contract': {
+        const body: any = {
+          proiectId: toolInput.proiect_id,
+          tipDocument: 'contract'
+        };
+        if (toolInput.data_contract) body.dataContract = toolInput.data_contract;
+        if (toolInput.custom_contract_number) body.customContractNumber = toolInput.custom_contract_number;
+        if (toolInput.observatii) body.observatii = toolInput.observatii;
+
+        const res = await fetch(`${context.baseUrl}/api/actions/contracts/generate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          return `Eroare la generare contract: ${err.error || err.details || `Status ${res.status}`}`;
+        }
+
+        const contractNumber = res.headers.get('X-Contract-Number') || '-';
+        const contractId = res.headers.get('X-Contract-ID') || '-';
+        const templateUsed = res.headers.get('X-Template-Used') || '-';
+        const totalEtape = res.headers.get('X-Total-Etape') || '0';
+
+        return `Contract generat cu succes!\n- Număr contract: ${contractNumber}\n- ID: ${contractId}\n- Template: ${templateUsed}\n- Etape: ${totalEtape}\n\nContractul DOCX a fost generat. Utilizatorul poate descărca din secțiunea Contracte a proiectului ${toolInput.proiect_id}.`;
+      }
+
+      // ==================== PV - PROCESE VERBALE (ADMIN) ====================
+      case 'generate_pv': {
+        const body: any = {
+          proiectId: toolInput.proiect_id,
+          tipDocument: 'pv'
+        };
+        if (toolInput.subproiecte_ids) body.subproiecteIds = toolInput.subproiecte_ids;
+        if (toolInput.observatii) body.observatii = toolInput.observatii;
+
+        const res = await fetch(`${context.baseUrl}/api/actions/pv/generate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          return `Eroare la generare PV: ${err.error || err.details || `Status ${res.status}`}`;
+        }
+
+        const pvNumber = res.headers.get('X-PV-Number') || '-';
+        const pvId = res.headers.get('X-PV-ID') || '-';
+        const subCount = res.headers.get('X-Subproiecte-Count') || '0';
+
+        return `Proces Verbal generat cu succes!\n- Număr PV: ${pvNumber}\n- ID: ${pvId}\n- Subproiecte incluse: ${subCount}\n\nPV-ul DOCX a fost generat. Utilizatorul poate descărca din secțiunea Procese Verbale a proiectului ${toolInput.proiect_id}.`;
+      }
+
+      // ==================== FACTURI - GENERARE (ADMIN) ====================
+      case 'generate_invoice': {
+        // Pasul 1: Obține datele proiectului pentru a completa factura
+        const proiectData = await fetchApi(context.baseUrl, `/api/rapoarte/proiecte?search=${encodeURIComponent(toolInput.proiect_id)}&limit=1`);
+        if (!proiectData.success || !proiectData.data?.length) {
+          return `Eroare: Nu am găsit proiectul ${toolInput.proiect_id}`;
+        }
+        const proiect = proiectData.data[0];
+
+        // Pasul 2: Obține datele clientului
+        let clientInfo: any = null;
+        if (proiect.Client) {
+          const clientData = await fetchApi(context.baseUrl, `/api/rapoarte/clienti?search=${encodeURIComponent(proiect.Client)}&limit=1`);
+          if (clientData.success && clientData.data?.length) {
+            clientInfo = clientData.data[0];
+          }
+        }
+
+        if (!clientInfo) {
+          return `Eroare: Nu am putut identifica clientul pentru proiectul ${toolInput.proiect_id}. Clientul "${proiect.Client || '-'}" nu a fost găsit în baza de date.`;
+        }
+
+        // Pasul 3: Obține contractul (dacă nu e specificat)
+        let contractId = toolInput.contract_id;
+        if (!contractId) {
+          const contractData = await fetchApi(context.baseUrl, `/api/rapoarte/contracte?proiect_id=${toolInput.proiect_id}&limit=1`);
+          if (contractData.success && contractData.data?.length) {
+            contractId = contractData.data[0].ID_Contract;
+          }
+        }
+
+        // Pasul 4: Construiește liniile facturii
+        let liniiFactura = toolInput.linii_factura;
+        if (!liniiFactura || liniiFactura.length === 0) {
+          // Dacă nu sunt specificate, creează o linie din datele proiectului
+          const valoare = parseFloat(proiect.Valoare_Estimata) || 0;
+          if (valoare === 0) {
+            return `Eroare: Proiectul ${toolInput.proiect_id} nu are valoare estimată. Specifică liniile facturii manual cu parametrul linii_factura.`;
+          }
+          liniiFactura = [{
+            descriere: proiect.Denumire || 'Servicii conform contract',
+            cantitate: 1,
+            pret_unitar: valoare,
+            um: 'buc',
+            tva_procent: 19
+          }];
+        }
+
+        // Formatează liniile pentru API
+        const liniiFormatate = liniiFactura.map((l: any) => ({
+          descriere: l.descriere,
+          cantitate: l.cantitate || 1,
+          pretUnitar: l.pret_unitar,
+          um: l.um || 'buc',
+          tvaProcent: l.tva_procent !== undefined ? l.tva_procent : 19,
+          valoare: (l.cantitate || 1) * (l.pret_unitar || 0),
+          tvaValoare: ((l.cantitate || 1) * (l.pret_unitar || 0)) * ((l.tva_procent !== undefined ? l.tva_procent : 19) / 100)
+        }));
+
+        const body: any = {
+          proiectId: toolInput.proiect_id,
+          liniiFactura: liniiFormatate,
+          clientInfo: {
+            id: clientInfo.id,
+            nume: clientInfo.nume,
+            denumire: clientInfo.nume,
+            cui: clientInfo.cui || '',
+            adresa: clientInfo.adresa || '',
+            email: clientInfo.email || '',
+            telefon: clientInfo.telefon || '',
+            banca: clientInfo.banca || '',
+            iban: clientInfo.iban || '',
+            nr_reg_com: clientInfo.nr_reg_com || ''
+          },
+          observatii: toolInput.observatii || '',
+          sendToAnaf: toolInput.send_to_anaf || false,
+          contractId: contractId || null
+        };
+
+        const data = await fetchApi(context.baseUrl, '/api/actions/invoices/generate-hibrid', {
+          method: 'POST',
+          body: JSON.stringify(body)
+        });
+
+        if (!data.success) {
+          return `Eroare la generare factură: ${data.error || data.details || 'Necunoscută'}`;
+        }
+
+        const inv = data.invoiceData || {};
+        let result = `Factură generată cu succes!\n`;
+        result += `- Număr: ${inv.numarFactura || '-'}\n`;
+        result += `- Client: ${inv.client || clientInfo.nume}\n`;
+        result += `- Total: ${formatNumber(inv.total || 0)} RON\n`;
+        if (data.efactura?.xmlGenerated) result += `- e-Factura XML: generat\n`;
+        result += `\nFactura PDF este disponibilă în secțiunea Facturi a proiectului ${toolInput.proiect_id}.`;
+        return result;
+      }
+
+      // ==================== EMAIL CLIENT (ADMIN) ====================
+      case 'send_email_to_client': {
+        const body = {
+          destinatar: toolInput.destinatar,
+          subiect: toolInput.subiect,
+          continut: toolInput.continut,
+          from_address: toolInput.from_address || 'office@unitarproiect.eu',
+          proiect_id: toolInput.proiect_id || null,
+          sent_by: context.userId,
+          sent_by_name: context.userName
+        };
+
+        const data = await fetchApi(context.baseUrl, '/api/ai/send-email', {
+          method: 'POST',
+          body: JSON.stringify(body)
+        });
+
+        if (!data.success) {
+          return `Eroare la trimitere email: ${data.error || data.details || 'Necunoscută'}`;
+        }
+
+        return `Email trimis cu succes!\n- Către: ${toolInput.destinatar}\n- Subiect: ${toolInput.subiect}\n- De pe: ${toolInput.from_address || 'office@unitarproiect.eu'}`;
+      }
+
       // ==================== FINANCIAR (ADMIN) ====================
       case 'list_propuneri_incasari': {
         const params = new URLSearchParams();

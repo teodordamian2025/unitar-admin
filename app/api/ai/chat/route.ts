@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
     // Apelează Claude Haiku
     let response = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 1024,
+      max_tokens: 2048,
       system: getSystemPrompt(role, name),
       tools,
       messages: session.messages.map(m => ({
@@ -148,7 +148,7 @@ export async function POST(request: NextRequest) {
       // Apelează Claude din nou cu rezultatele
       response = await anthropic.messages.create({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 1024,
+        max_tokens: 2048,
         system: getSystemPrompt(role, name),
         tools,
         messages: session.messages.map(m => ({

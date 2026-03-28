@@ -469,6 +469,303 @@ const allTools: ToolDefinition[] = [
     },
     adminOnly: true
   },
+  // ==================== CLIENȚI (ADMIN ONLY) ====================
+  {
+    name: 'search_clients',
+    description: 'Caută clienți după nume, CUI sau email. Returnează lista de clienți cu date de contact, tip (PJ/PF), CUI, email, telefon, IBAN. Folosește acest tool când utilizatorul întreabă despre un client, vrea să găsească date de contact, sau caută un client specific.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        search: {
+          type: 'string',
+          description: 'Termen de căutare - caută în nume, CUI, email'
+        },
+        tip_client: {
+          type: 'string',
+          description: 'Filtru tip client: "Juridic", "Fizic"'
+        },
+        limit: {
+          type: 'number',
+          description: 'Numărul maxim de rezultate (default: 20)'
+        }
+      }
+    },
+    adminOnly: true
+  },
+  {
+    name: 'create_client',
+    description: 'Creează un client nou în sistem. Suportă persoane juridice (PJ - necesită CUI) și persoane fizice (PF - necesită CNP). IMPORTANT: Înainte de a crea, caută mai întâi clientul cu search_clients pentru a evita duplicatele. Cere CONFIRMARE explicită utilizatorului înainte de a executa.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        nume: {
+          type: 'string',
+          description: 'Numele clientului (obligatoriu)'
+        },
+        tip_client: {
+          type: 'string',
+          enum: ['Juridic', 'Fizic'],
+          description: 'Tipul clientului: "Juridic" (PJ) sau "Fizic" (PF)'
+        },
+        cui: {
+          type: 'string',
+          description: 'CUI-ul (obligatoriu pentru PJ). Ex: "RO12345678" sau "12345678"'
+        },
+        cnp: {
+          type: 'string',
+          description: 'CNP-ul (obligatoriu pentru PF)'
+        },
+        email: {
+          type: 'string',
+          description: 'Adresa de email a clientului'
+        },
+        telefon: {
+          type: 'string',
+          description: 'Numărul de telefon'
+        },
+        adresa: {
+          type: 'string',
+          description: 'Adresa completă'
+        },
+        oras: {
+          type: 'string',
+          description: 'Orașul'
+        },
+        judet: {
+          type: 'string',
+          description: 'Județul'
+        },
+        banca: {
+          type: 'string',
+          description: 'Numele băncii'
+        },
+        iban: {
+          type: 'string',
+          description: 'Codul IBAN'
+        },
+        nr_reg_com: {
+          type: 'string',
+          description: 'Număr registrul comerțului (pentru PJ)'
+        },
+        observatii: {
+          type: 'string',
+          description: 'Observații sau note'
+        }
+      },
+      required: ['nume', 'tip_client']
+    },
+    adminOnly: true
+  },
+  {
+    name: 'update_client',
+    description: 'Actualizează datele unui client existent - email, telefon, adresă, IBAN, etc. Necesită ID-ul clientului (obținut prin search_clients). Cere CONFIRMARE explicită utilizatorului înainte de a executa.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        id: {
+          type: 'string',
+          description: 'ID-ul clientului de actualizat (obligatoriu - obține-l din search_clients)'
+        },
+        nume: {
+          type: 'string',
+          description: 'Numele actualizat'
+        },
+        email: {
+          type: 'string',
+          description: 'Email-ul actualizat'
+        },
+        telefon: {
+          type: 'string',
+          description: 'Telefonul actualizat'
+        },
+        adresa: {
+          type: 'string',
+          description: 'Adresa actualizată'
+        },
+        oras: {
+          type: 'string',
+          description: 'Orașul actualizat'
+        },
+        judet: {
+          type: 'string',
+          description: 'Județul actualizat'
+        },
+        banca: {
+          type: 'string',
+          description: 'Banca actualizată'
+        },
+        iban: {
+          type: 'string',
+          description: 'IBAN-ul actualizat'
+        },
+        observatii: {
+          type: 'string',
+          description: 'Observații actualizate'
+        }
+      },
+      required: ['id']
+    },
+    adminOnly: true
+  },
+
+  // ==================== CONTRACTE (ADMIN ONLY) ====================
+  {
+    name: 'list_contracts',
+    description: 'Listează contractele. Returnează număr contract, proiect, client, valoare, etape, status. Folosește acest tool când utilizatorul întreabă despre contracte, contractele unui proiect, sau caută un contract specific. Doar pentru admin.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        proiect_id: {
+          type: 'string',
+          description: 'ID-ul proiectului pentru contractele sale'
+        },
+        search: {
+          type: 'string',
+          description: 'Căutare după număr contract, client'
+        },
+        status: {
+          type: 'string',
+          description: 'Filtru status contract'
+        },
+        limit: {
+          type: 'number',
+          description: 'Numărul maxim de rezultate (default: 20)'
+        }
+      }
+    },
+    adminOnly: true
+  },
+  {
+    name: 'generate_contract',
+    description: 'Generează un contract DOCX pentru un proiect. Contractul se generează pe baza datelor din proiect și client. OBLIGATORIU: Prezintă un rezumat al contractului și cere CONFIRMARE explicită ("da", "generează") înainte de a executa. Doar pentru admin.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        proiect_id: {
+          type: 'string',
+          description: 'ID-ul proiectului (obligatoriu)'
+        },
+        data_contract: {
+          type: 'string',
+          description: 'Data contractului în format YYYY-MM-DD (default: azi)'
+        },
+        custom_contract_number: {
+          type: 'string',
+          description: 'Număr de contract personalizat (opțional - se generează automat dacă nu e specificat)'
+        },
+        observatii: {
+          type: 'string',
+          description: 'Observații adăugate la contract'
+        }
+      },
+      required: ['proiect_id']
+    },
+    adminOnly: true
+  },
+
+  // ==================== PV - PROCESE VERBALE (ADMIN ONLY) ====================
+  {
+    name: 'generate_pv',
+    description: 'Generează un Proces Verbal de predare-primire (PV) DOCX pentru un proiect. PV-ul documentează predarea lucrărilor. OBLIGATORIU: Prezintă un rezumat și cere CONFIRMARE explicită înainte de a executa. Doar pentru admin.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        proiect_id: {
+          type: 'string',
+          description: 'ID-ul proiectului (obligatoriu)'
+        },
+        subproiecte_ids: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Lista de ID-uri ale subproiectelor de inclus în PV (opțional - dacă nu se specifică, se includ toate)'
+        },
+        observatii: {
+          type: 'string',
+          description: 'Observații adăugate la PV'
+        }
+      },
+      required: ['proiect_id']
+    },
+    adminOnly: true
+  },
+
+  // ==================== FACTURI - GENERARE (ADMIN ONLY) ====================
+  {
+    name: 'generate_invoice',
+    description: 'Generează o factură PDF pentru un proiect. IMPORTANT: Aceasta este o operație complexă. Pașii obligatorii: 1) Caută proiectul cu list_projects, 2) Caută contractul cu list_contracts, 3) Prezintă utilizatorului un REZUMAT DETALIAT cu: client, valoare, etape facturate, monedă, 4) Cere CONFIRMARE EXPLICITĂ ("da", "facturează"), 5) Doar apoi execută. Doar pentru admin.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        proiect_id: {
+          type: 'string',
+          description: 'ID-ul proiectului (obligatoriu)'
+        },
+        contract_id: {
+          type: 'string',
+          description: 'ID-ul contractului de facturat (opțional - se caută automat din proiect)'
+        },
+        linii_factura: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              descriere: { type: 'string', description: 'Descrierea liniei' },
+              cantitate: { type: 'number', description: 'Cantitatea' },
+              pret_unitar: { type: 'number', description: 'Prețul unitar fără TVA' },
+              um: { type: 'string', description: 'Unitate de măsură (default: "buc")' },
+              tva_procent: { type: 'number', description: 'Procent TVA (default: 19)' }
+            }
+          },
+          description: 'Liniile facturii. Dacă nu se specifică, se preiau din etapele contractului.'
+        },
+        observatii: {
+          type: 'string',
+          description: 'Observații pe factură'
+        },
+        send_to_anaf: {
+          type: 'boolean',
+          description: 'Trimite automat la ANAF e-Factura (default: false)'
+        }
+      },
+      required: ['proiect_id']
+    },
+    adminOnly: true
+  },
+
+  // ==================== EMAIL CLIENT (ADMIN ONLY) ====================
+  {
+    name: 'send_email_to_client',
+    description: 'Trimite un email către un client. OBLIGATORIU: Prezintă COMPLET emailul (destinatar, subiect, conținut) și cere CONFIRMARE EXPLICITĂ ("da", "trimite") înainte de a trimite. Acest tool poate trimite de pe office@unitarproiect.eu sau contact@unitarproiect.eu. Doar pentru admin.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        destinatar: {
+          type: 'string',
+          description: 'Adresa email a destinatarului (obligatoriu)'
+        },
+        subiect: {
+          type: 'string',
+          description: 'Subiectul emailului (obligatoriu)'
+        },
+        continut: {
+          type: 'string',
+          description: 'Conținutul emailului în text simplu (obligatoriu). Poate conține paragrafe separate prin \\n.'
+        },
+        from_address: {
+          type: 'string',
+          enum: ['office@unitarproiect.eu', 'contact@unitarproiect.eu'],
+          description: 'Adresa de la care se trimite (default: "office@unitarproiect.eu")'
+        },
+        proiect_id: {
+          type: 'string',
+          description: 'ID-ul proiectului asociat (opțional - pentru logging)'
+        }
+      },
+      required: ['destinatar', 'subiect', 'continut']
+    },
+    adminOnly: true
+  },
+
   {
     name: 'get_sold_bancar',
     description: 'Obține soldul disponibil curent din contul bancar (SmartFintech). Folosește acest tool când utilizatorul întreabă despre sold, bani în cont, disponibil, sau cât avem în cont. Doar pentru admin.',
