@@ -966,6 +966,79 @@ export async function executeTool(
         return `Reminder setat pentru ${formatDate(toolInput.reminder_data)}: "${toolInput.continut}" (ID: ${data.memoryId}).`;
       }
 
+      // ==================== EMAIL INBOX (ADMIN) ====================
+      case 'read_emails': {
+        const params = new URLSearchParams();
+        params.set('email_account', toolInput.email_account || 'office@unitarproiect.eu');
+        if (toolInput.query) params.set('query', toolInput.query);
+        if (toolInput.unread_only) params.set('unread_only', 'true');
+        params.set('limit', String(toolInput.limit || 15));
+
+        const data = await fetchApi(context.baseUrl, `/api/ai/email?${params}`);
+        if (!data.success) {
+          if (data.needs_auth) return `⚠️ Contul ${toolInput.email_account || 'office@unitarproiect.eu'} nu este conectat. Utilizatorul trebuie să meargă la Setări → Email Connect pentru a autoriza accesul Gmail.`;
+          return `Eroare: ${data.error || 'Nu s-au putut citi emailurile'}`;
+        }
+
+        const emails = data.emails || [];
+        if (emails.length === 0) return `Nu am găsit emailuri${toolInput.unread_only ? ' necitite' : ''} în inbox-ul ${data.account}.`;
+
+        let result = `${emails.length} emailuri din ${data.account}${toolInput.unread_only ? ' (necitite)' : ''}:\n\n`;
+        for (const e of emails) {
+          const unread = e.isUnread ? '🔵' : '📧';
+          const attach = e.hasAttachments ? ' 📎' : '';
+          result += `- ${unread} [${e.id}] De la: ${e.from}\n  Subiect: ${e.subject}\n  Data: ${e.date}${attach}\n  Preview: ${e.snippet?.substring(0, 100)}...\n\n`;
+        }
+        return result;
+      }
+
+      case 'read_email_detail': {
+        const params = new URLSearchParams();
+        params.set('email_account', toolInput.email_account || 'office@unitarproiect.eu');
+        params.set('message_id', toolInput.message_id);
+
+        const data = await fetchApi(context.baseUrl, `/api/ai/email?${params}`);
+        if (!data.success) {
+          if (data.needs_auth) return `⚠️ Contul nu este conectat. Mergi la Setări → Email Connect.`;
+          return `Eroare: ${data.error || 'Nu s-a putut citi emailul'}`;
+        }
+
+        const e = data.email;
+        if (!e) return 'Emailul nu a fost găsit.';
+
+        let result = `📧 Email detalii:\n`;
+        result += `De la: ${e.from}\n`;
+        result += `Către: ${e.to}\n`;
+        if (e.cc) result += `CC: ${e.cc}\n`;
+        result += `Subiect: ${e.subject}\n`;
+        result += `Data: ${e.date}\n`;
+        if (e.attachments?.length > 0) {
+          result += `Atașamente: ${e.attachments.map((a: any) => a.filename).join(', ')}\n`;
+        }
+        result += `\n--- CONȚINUT ---\n${e.body}\n--- SFÂRȘIT ---`;
+        return result;
+      }
+
+      case 'reply_to_email': {
+        const body = {
+          email_account: toolInput.email_account || 'office@unitarproiect.eu',
+          message_id: toolInput.message_id,
+          reply_body: toolInput.reply_body,
+        };
+
+        const data = await fetchApi(context.baseUrl, '/api/ai/email/reply', {
+          method: 'POST',
+          body: JSON.stringify(body)
+        });
+
+        if (!data.success) {
+          if (data.needs_auth) return `⚠️ Contul nu este conectat. Mergi la Setări → Email Connect.`;
+          return `Eroare la trimitere reply: ${data.error || 'Necunoscută'}`;
+        }
+
+        return `✅ Reply trimis cu succes de pe ${body.email_account}!`;
+      }
+
       // ==================== TRIGGERS AI ====================
       case 'list_active_triggers': {
         const params = new URLSearchParams();

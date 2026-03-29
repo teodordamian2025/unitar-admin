@@ -962,6 +962,79 @@ const allTools: ToolDefinition[] = [
       required: ['trigger_id', 'raspuns']
     },
     adminOnly: true
+  },
+
+  // ==================== EMAIL INBOX (ADMIN ONLY) ====================
+  {
+    name: 'read_emails',
+    description: 'Citește emailurile din inbox-ul office@unitarproiect.eu sau contact@unitarproiect.eu. Returnează listă cu subiect, expeditor, dată, snippet. Folosește când utilizatorul întreabă "ce emailuri am primit?", "ce e nou în inbox?", "am primit ceva de la X?".',
+    input_schema: {
+      type: 'object',
+      properties: {
+        email_account: {
+          type: 'string',
+          enum: ['office@unitarproiect.eu', 'contact@unitarproiect.eu'],
+          description: 'Contul de email de citit (default: office@unitarproiect.eu)'
+        },
+        query: {
+          type: 'string',
+          description: 'Căutare în emailuri (ex: "from:client@email.com", "factura", "contract"). Suportă sintaxa Gmail search.'
+        },
+        unread_only: {
+          type: 'boolean',
+          description: 'Doar emailuri necitite (default: false)'
+        },
+        limit: {
+          type: 'number',
+          description: 'Numărul maxim de emailuri (default: 15)'
+        }
+      }
+    },
+    adminOnly: true
+  },
+  {
+    name: 'read_email_detail',
+    description: 'Citește conținutul complet al unui email specific. Necesită message_id obținut din read_emails. Folosește când utilizatorul vrea să vadă conținutul unui email.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        email_account: {
+          type: 'string',
+          enum: ['office@unitarproiect.eu', 'contact@unitarproiect.eu'],
+          description: 'Contul de email (default: office@unitarproiect.eu)'
+        },
+        message_id: {
+          type: 'string',
+          description: 'ID-ul mesajului de citit (din read_emails)'
+        }
+      },
+      required: ['message_id']
+    },
+    adminOnly: true
+  },
+  {
+    name: 'reply_to_email',
+    description: 'Răspunde la un email din inbox. OBLIGATORIU: Prezintă COMPLET draft-ul răspunsului (destinatar, subiect, conținut) și cere CONFIRMARE EXPLICITĂ înainte de a trimite. Răspunsul se trimite în același thread. Scrie ca un manager profesionist. Doar pentru admin.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        email_account: {
+          type: 'string',
+          enum: ['office@unitarproiect.eu', 'contact@unitarproiect.eu'],
+          description: 'Contul de pe care se răspunde (default: office@unitarproiect.eu)'
+        },
+        message_id: {
+          type: 'string',
+          description: 'ID-ul mesajului la care se răspunde (din read_emails sau read_email_detail)'
+        },
+        reply_body: {
+          type: 'string',
+          description: 'Conținutul răspunsului în text simplu'
+        }
+      },
+      required: ['message_id', 'reply_body']
+    },
+    adminOnly: true
   }
 ];
 
