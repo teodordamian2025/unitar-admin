@@ -628,26 +628,44 @@ export async function executeTool(
 
       // ==================== EMAIL CLIENT (ADMIN) ====================
       case 'send_email_to_client': {
-        const body = {
-          destinatar: toolInput.destinatar,
-          subiect: toolInput.subiect,
-          continut: toolInput.continut,
-          from_address: toolInput.from_address || 'office@unitarproiect.eu',
-          proiect_id: toolInput.proiect_id || null,
-          sent_by: context.userId,
-          sent_by_name: context.userName
-        };
+        const fromAccount = toolInput.from_address || 'office@unitarproiect.eu';
 
-        const data = await fetchApi(context.baseUrl, '/api/ai/send-email', {
+        // Folosește Gmail API (funcționează pe Vercel) în loc de SMTP
+        const data = await fetchApi(context.baseUrl, '/api/ai/email/reply', {
           method: 'POST',
-          body: JSON.stringify(body)
+          body: JSON.stringify({
+            email_account: fromAccount,
+            to: toolInput.destinatar,
+            subject: toolInput.subiect,
+            reply_body: toolInput.continut,
+            is_new: true,
+          })
         });
 
         if (!data.success) {
-          return `Eroare la trimitere email: ${data.error || data.details || 'Necunoscută'}`;
+          // Fallback la SMTP dacă Gmail API nu e conectat
+          if (data.needs_auth) {
+            const smtpData = await fetchApi(context.baseUrl, '/api/ai/send-email', {
+              method: 'POST',
+              body: JSON.stringify({
+                destinatar: toolInput.destinatar,
+                subiect: toolInput.subiect,
+                continut: toolInput.continut,
+                from_address: fromAccount,
+                proiect_id: toolInput.proiect_id || null,
+                sent_by: context.userId,
+                sent_by_name: context.userName
+              })
+            });
+            if (!smtpData.success) {
+              return `Eroare la trimitere email: ${smtpData.error || 'Necunoscută'}`;
+            }
+            return `Email trimis cu succes (via SMTP)!\n- Către: ${toolInput.destinatar}\n- Subiect: ${toolInput.subiect}\n- De pe: ${fromAccount}`;
+          }
+          return `Eroare la trimitere email: ${data.error || 'Necunoscută'}`;
         }
 
-        return `Email trimis cu succes!\n- Către: ${toolInput.destinatar}\n- Subiect: ${toolInput.subiect}\n- De pe: ${toolInput.from_address || 'office@unitarproiect.eu'}`;
+        return `Email trimis cu succes!\n- Către: ${toolInput.destinatar}\n- Subiect: ${toolInput.subiect}\n- De pe: ${fromAccount}`;
       }
 
       // ==================== FINANCIAR (ADMIN) ====================
