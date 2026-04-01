@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
 
     // 2. Fetch user info pentru fiecare destinatar
     const usersQuery = `
-      SELECT uid as user_id, nume, email
+      SELECT uid as user_id, nume, COALESCE(email_comunicare, email) as email
       FROM ${TABLE_UTILIZATORI}
       WHERE uid IN UNNEST(@user_ids)
     `;

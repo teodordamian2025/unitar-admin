@@ -381,7 +381,7 @@ export async function GET(request: NextRequest) {
           pa.progres_procent,
           u.uid as responsabil_uid,
           CONCAT(u.nume, ' ', u.prenume) as user_name,
-          u.email as user_email,
+          COALESCE(u.email_comunicare, u.email) as user_email,
           u.rol as user_rol
         FROM proiecte_apropiate pa
         LEFT JOIN ${TABLE_UTILIZATORI} u ON (
@@ -402,7 +402,7 @@ export async function GET(request: NextRequest) {
           pa.progres_procent,
           pr.responsabil_uid,
           pr.responsabil_nume as user_name,
-          u.email as user_email,
+          COALESCE(u.email_comunicare, u.email) as user_email,
           u.rol as user_rol
         FROM proiecte_apropiate pa
         INNER JOIN ${TABLE_PROIECTE_RESPONSABILI} pr ON pr.proiect_id = pa.id
@@ -521,7 +521,7 @@ export async function GET(request: NextRequest) {
           pd.progres_procent,
           u.uid as responsabil_uid,
           CONCAT(u.nume, ' ', u.prenume) as user_name,
-          u.email as user_email,
+          COALESCE(u.email_comunicare, u.email) as user_email,
           u.rol as user_rol
         FROM proiecte_depasite pd
         LEFT JOIN ${TABLE_UTILIZATORI} u ON (
@@ -541,7 +541,7 @@ export async function GET(request: NextRequest) {
           pd.progres_procent,
           pr.responsabil_uid,
           pr.responsabil_nume as user_name,
-          u.email as user_email,
+          COALESCE(u.email_comunicare, u.email) as user_email,
           u.rol as user_rol
         FROM proiecte_depasite pd
         INNER JOIN ${TABLE_PROIECTE_RESPONSABILI} pr ON pr.proiect_id = pd.id
@@ -665,7 +665,7 @@ export async function GET(request: NextRequest) {
           sa.client,
           u.uid as responsabil_uid,
           CONCAT(u.nume, ' ', u.prenume) as user_name,
-          u.email as user_email,
+          COALESCE(u.email_comunicare, u.email) as user_email,
           u.rol as user_rol
         FROM subproiecte_apropiate sa
         LEFT JOIN ${TABLE_UTILIZATORI} u ON (
@@ -687,7 +687,7 @@ export async function GET(request: NextRequest) {
           sa.client,
           sr.responsabil_uid,
           sr.responsabil_nume as user_name,
-          u.email as user_email,
+          COALESCE(u.email_comunicare, u.email) as user_email,
           u.rol as user_rol
         FROM subproiecte_apropiate sa
         INNER JOIN ${TABLE_SUBPROIECTE_RESPONSABILI} sr ON sr.subproiect_id = sa.id
@@ -813,7 +813,7 @@ export async function GET(request: NextRequest) {
           sd.client,
           u.uid as responsabil_uid,
           CONCAT(u.nume, ' ', u.prenume) as user_name,
-          u.email as user_email,
+          COALESCE(u.email_comunicare, u.email) as user_email,
           u.rol as user_rol
         FROM subproiecte_depasite sd
         LEFT JOIN ${TABLE_UTILIZATORI} u ON (
@@ -835,7 +835,7 @@ export async function GET(request: NextRequest) {
           sd.client,
           sr.responsabil_uid,
           sr.responsabil_nume as user_name,
-          u.email as user_email,
+          COALESCE(u.email_comunicare, u.email) as user_email,
           u.rol as user_rol
         FROM subproiecte_depasite sd
         INNER JOIN ${TABLE_SUBPROIECTE_RESPONSABILI} sr ON sr.subproiect_id = sd.id
@@ -930,7 +930,7 @@ export async function GET(request: NextRequest) {
         s.progres_procent as progres_procent,
         sr.responsabil_uid as responsabil_uid,
         sr.responsabil_nume as responsabil_nume,
-        u.email as user_email,
+        COALESCE(u.email_comunicare, u.email) as user_email,
         u.rol as user_rol,
         p.Denumire as proiect_denumire,
         p.Client as client
@@ -1030,7 +1030,7 @@ export async function GET(request: NextRequest) {
         s.progres_procent as progres_procent,
         sr.responsabil_uid as responsabil_uid,
         sr.responsabil_nume as responsabil_nume,
-        u.email as user_email,
+        COALESCE(u.email_comunicare, u.email) as user_email,
         u.rol as user_rol,
         p.Denumire as proiect_denumire,
         p.Client as client
@@ -1219,9 +1219,9 @@ export async function GET(request: NextRequest) {
     if (facturiScadentaApropiate.length > 0) {
       // Obține toți adminii pentru notificare
       const adminiScadentaQuery = `
-        SELECT uid, nume, prenume, email
+        SELECT uid, nume, prenume, COALESCE(email_comunicare, email) as email
         FROM ${TABLE_UTILIZATORI}
-        WHERE rol = 'admin' AND activ = true AND email IS NOT NULL
+        WHERE rol = 'admin' AND activ = true AND COALESCE(email_comunicare, email) IS NOT NULL
       `;
       const [adminiScadenta] = await bigquery.query({ query: adminiScadentaQuery });
 
@@ -1402,9 +1402,9 @@ export async function GET(request: NextRequest) {
 
       // Obține toți adminii pentru notificare
       const adminiDepasitaQuery = `
-        SELECT uid, nume, prenume, email
+        SELECT uid, nume, prenume, COALESCE(email_comunicare, email) as email
         FROM ${TABLE_UTILIZATORI}
-        WHERE rol = 'admin' AND activ = true AND email IS NOT NULL
+        WHERE rol = 'admin' AND activ = true AND COALESCE(email_comunicare, email) IS NOT NULL
       `;
       const [adminiDepasita] = await bigquery.query({ query: adminiDepasitaQuery });
 
@@ -1557,9 +1557,9 @@ export async function GET(request: NextRequest) {
     if (facturiNetrimise.length > 0) {
       // Obține toți adminii pentru a le trimite notificarea
       const adminiQuery = `
-        SELECT uid, nume, prenume, email
+        SELECT uid, nume, prenume, COALESCE(email_comunicare, email) as email
         FROM ${TABLE_UTILIZATORI}
-        WHERE rol = 'admin' AND activ = true AND email IS NOT NULL
+        WHERE rol = 'admin' AND activ = true AND COALESCE(email_comunicare, email) IS NOT NULL
       `;
 
       const [admini] = await bigquery.query({ query: adminiQuery });

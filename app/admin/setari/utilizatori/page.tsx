@@ -18,6 +18,7 @@ import { toast } from 'react-toastify';
 interface User {
   uid: string;
   email: string;
+  email_comunicare: string | null;
   nume: string;
   prenume: string;
   nume_complet: string;
@@ -36,6 +37,7 @@ interface User {
 
 interface UserFormData {
   email: string;
+  email_comunicare: string;
   nume: string;
   prenume: string;
   rol: 'admin' | 'normal';
@@ -97,6 +99,7 @@ const ModernUsersPage: React.FC = () => {
   // Form data
   const [formData, setFormData] = useState<UserFormData>({
     email: '',
+    email_comunicare: '',
     nume: '',
     prenume: '',
     rol: 'normal',
@@ -185,6 +188,7 @@ const ModernUsersPage: React.FC = () => {
       body: JSON.stringify({
         uid,
         email: userData.email,
+        email_comunicare: userData.email_comunicare || null,
         nume: userData.nume,
         prenume: userData.prenume,
         rol: userData.rol,
@@ -219,6 +223,7 @@ const ModernUsersPage: React.FC = () => {
       // Reset form și refresh data
       setFormData({
         email: '',
+        email_comunicare: '',
         nume: '',
         prenume: '',
         rol: 'normal',
@@ -248,6 +253,7 @@ const ModernUsersPage: React.FC = () => {
           uid: selectedUser.uid,
           nume: formData.nume,
           prenume: formData.prenume,
+          email_comunicare: formData.email_comunicare || null,
           rol: formData.rol,
           permisiuni: PREDEFINED_PERMISSIONS[formData.rol],
           activ: formData.activ
@@ -330,6 +336,7 @@ const ModernUsersPage: React.FC = () => {
     setSelectedUser(user);
     setFormData({
       email: user.email,
+      email_comunicare: user.email_comunicare || '',
       nume: user.nume,
       prenume: user.prenume,
       rol: user.rol,
@@ -450,7 +457,8 @@ const ModernUsersPage: React.FC = () => {
               <thead>
                 <tr className="border-b border-gray-200">
                   <th className="text-left py-3 px-4 font-semibold text-gray-700">Utilizator</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700">Email</th>
+                  <th className="text-left py-3 px-4 font-semibold text-gray-700">Email Autentificare</th>
+                  <th className="text-left py-3 px-4 font-semibold text-gray-700">Email Comunicare</th>
                   <th className="text-left py-3 px-4 font-semibold text-gray-700">Rol</th>
                   <th className="text-left py-3 px-4 font-semibold text-gray-700">Status</th>
                   <th className="text-left py-3 px-4 font-semibold text-gray-700">Ultima Conectare</th>
@@ -476,6 +484,9 @@ const ModernUsersPage: React.FC = () => {
                       </div>
                     </td>
                     <td className="py-4 px-4 text-gray-600">{user.email}</td>
+                    <td className="py-4 px-4 text-gray-600">
+                      {user.email_comunicare || <span className="text-gray-400 italic text-sm">= email autentificare</span>}
+                    </td>
                     <td className="py-4 px-4">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                         user.rol === 'admin'
@@ -531,7 +542,7 @@ const ModernUsersPage: React.FC = () => {
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Email *
+              Email Autentificare *
             </label>
             <Input
               type="email"
@@ -539,6 +550,20 @@ const ModernUsersPage: React.FC = () => {
               value={formData.email}
               onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
             />
+            <p className="text-xs text-gray-500 mt-1">Folosit pentru login. Trebuie sa fie unic per utilizator.</p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Email Comunicare
+            </label>
+            <Input
+              type="email"
+              placeholder="proiectare@unitarproiect.eu"
+              value={formData.email_comunicare}
+              onChange={(e) => setFormData(prev => ({ ...prev, email_comunicare: e.target.value }))}
+            />
+            <p className="text-xs text-gray-500 mt-1">Folosit pentru notificari si comunicari. Poate fi partajat intre mai multi utilizatori. Daca e gol, se foloseste email-ul de autentificare.</p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -614,7 +639,7 @@ const ModernUsersPage: React.FC = () => {
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Email (nu se poate modifica)
+              Email Autentificare (nu se poate modifica)
             </label>
             <Input
               type="email"
@@ -622,6 +647,19 @@ const ModernUsersPage: React.FC = () => {
               disabled
               className="bg-gray-100"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Email Comunicare
+            </label>
+            <Input
+              type="email"
+              placeholder="proiectare@unitarproiect.eu"
+              value={formData.email_comunicare}
+              onChange={(e) => setFormData(prev => ({ ...prev, email_comunicare: e.target.value }))}
+            />
+            <p className="text-xs text-gray-500 mt-1">Folosit pentru notificari si comunicari. Daca e gol, se foloseste email-ul de autentificare.</p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">

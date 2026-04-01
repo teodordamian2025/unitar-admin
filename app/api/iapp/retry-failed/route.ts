@@ -474,7 +474,7 @@ async function sendAdminNotification(factura_id: string, failedRecord: any): Pro
 
     // Găsește adminii
     const adminQuery = `
-      SELECT uid, email, nume FROM \`${PROJECT_ID}.${DATASET}.Utilizatori_v2\`
+      SELECT uid, COALESCE(email_comunicare, email) as email, nume FROM \`${PROJECT_ID}.${DATASET}.Utilizatori_v2\`
       WHERE rol = 'admin' AND activ = TRUE
     `;
 

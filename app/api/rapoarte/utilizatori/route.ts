@@ -38,10 +38,11 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     
     // Query pentru utilizatori activi
-    let query = `SELECT 
+    let query = `SELECT
       uid,
-      email, 
-      nume, 
+      email,
+      email_comunicare,
+      nume,
       prenume,
       rol,
       activ,
@@ -104,6 +105,7 @@ export async function GET(request: NextRequest) {
     const utilizatoriFormatati = rows.map((row: any) => ({
       uid: row.uid,
       email: row.email,
+      email_comunicare: row.email_comunicare || null,
       nume: row.nume,
       prenume: row.prenume,
       nume_complet: `${row.prenume || ''} ${row.nume || ''}`.trim(),
@@ -134,10 +136,11 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     console.log('POST utilizator request body:', body);
     
-    const { 
+    const {
       uid,
-      email, 
-      nume, 
+      email,
+      email_comunicare,
+      nume,
       prenume,
       rol = 'normal',
       permisiuni = {
@@ -180,10 +183,11 @@ export async function POST(request: NextRequest) {
     // Query INSERT cu escape pentru securitate
     const insertQuery = `
       INSERT INTO ${TABLE_NAME}
-      (uid, email, nume, prenume, rol, permisiuni, activ, data_creare)
+      (uid, email, email_comunicare, nume, prenume, rol, permisiuni, activ, data_creare)
       VALUES (
         '${escapeString(uid)}',
         '${escapeString(email)}',
+        ${email_comunicare ? `'${escapeString(email_comunicare)}'` : 'NULL'},
         ${nume ? `'${escapeString(nume)}'` : 'NULL'},
         ${prenume ? `'${escapeString(prenume)}'` : 'NULL'},
         '${escapeString(rol)}',
@@ -232,7 +236,7 @@ export async function PUT(request: NextRequest) {
 
     // Construire query UPDATE dinamic
     const updateFields: string[] = [];
-    const allowedFields = ['email', 'nume', 'prenume', 'rol', 'permisiuni', 'activ'];
+    const allowedFields = ['email', 'email_comunicare', 'nume', 'prenume', 'rol', 'permisiuni', 'activ'];
 
     Object.entries(updateData).forEach(([key, value]) => {
       if (value !== undefined && allowedFields.includes(key)) {
