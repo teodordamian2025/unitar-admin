@@ -10,19 +10,14 @@ import * as admin from 'firebase-admin';
 // Inițializare Firebase Admin SDK (singleton pattern)
 if (!admin.apps.length) {
   try {
-    // Detectează automat project ID-ul corect pentru production
-    // În production token-urile vin cu audience "unitar-admin"
-    // În development folosim "unitarproiect"
-    // IMPORTANT: Trebuie să fie sincronizat cu NEXT_PUBLIC_FIREBASE_PROJECT_ID din client
-    const projectId = process.env.NODE_ENV === 'production'
-      ? 'unitar-admin'
-      : (process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'unitarproiect');
-
-    // Pentru production, verifică dacă e setat explicit un project ID Firebase
-    const finalProjectId = process.env.FIREBASE_ADMIN_PROJECT_ID || projectId;
+    // Folosește FIREBASE_ADMIN_PROJECT_ID dacă e setat explicit,
+    // altfel folosește NEXT_PUBLIC_FIREBASE_PROJECT_ID (proiectul Firebase real)
+    const finalProjectId = process.env.FIREBASE_ADMIN_PROJECT_ID
+      || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID
+      || 'unitarproiect';
 
     console.log(`🔧 Firebase Admin SDK initializing with project ID: ${finalProjectId}`);
-    console.log(`🔧 Environment: ${process.env.NODE_ENV}, Auto-detected: ${projectId}, Final: ${finalProjectId}`);
+    console.log(`🔧 Environment: ${process.env.NODE_ENV}`);
 
     const serviceAccount = {
       projectId: finalProjectId,

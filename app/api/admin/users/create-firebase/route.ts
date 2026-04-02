@@ -6,19 +6,7 @@
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuth } from 'firebase-admin/auth';
-import { initializeApp, getApps, cert } from 'firebase-admin/app';
-
-// Initialize Firebase Admin SDK
-if (getApps().length === 0) {
-  initializeApp({
-    credential: cert({
-      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-      clientEmail: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
-      privateKey: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-    }),
-  });
-}
+import { admin } from '@/lib/firebase-admin';
 
 export async function POST(request: NextRequest) {
   try {
@@ -41,15 +29,22 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    const auth = getAuth();
+    const auth = admin.auth();
 
     // Verifică dacă utilizatorul există deja
     try {
-      await auth.getUserByEmail(email);
+      const existingUser = await auth.getUserByEmail(email);
+      // Utilizatorul există deja - returnăm UID-ul pentru a permite inserarea în BigQuery
+      console.log(`Utilizator Firebase existent găsit: ${existingUser.uid} - ${email}`);
       return NextResponse.json({
-        success: false,
-        error: 'Un utilizator cu acest email există deja în Firebase'
-      }, { status: 409 });
+        success: true,
+        message: 'Utilizatorul există deja în Firebase, se folosește contul existent',
+        data: {
+          uid: existingUser.uid,
+          email: existingUser.email,
+          existing: true
+        }
+      });
     } catch (error: any) {
       // Error normal - utilizatorul nu există, putem continua
       if (error.code !== 'auth/user-not-found') {
@@ -137,7 +132,7 @@ export async function POST(request: NextRequest) {
 // GET method pentru testare conexiune Firebase Admin
 export async function GET() {
   try {
-    const auth = getAuth();
+    const auth = admin.auth();
 
     // Test simplu - listează primii 10 utilizatori
     const listUsersResult = await auth.listUsers(10);

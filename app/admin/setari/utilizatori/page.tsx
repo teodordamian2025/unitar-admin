@@ -161,22 +161,24 @@ const ModernUsersPage: React.FC = () => {
   // ==================================================================
 
   const createFirebaseUser = async (email: string): Promise<string> => {
-    try {
-      const response = await fetch('/api/admin/users/create-firebase', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
-      });
+    const response = await fetch('/api/admin/users/create-firebase', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
 
-      const data = await response.json();
-      if (!data.success) {
-        throw new Error(data.error || 'Eroare la crearea utilizatorului în Firebase');
-      }
-
-      return data.uid;
-    } catch (error) {
-      throw new Error(`Firebase Error: ${error instanceof Error ? error.message : 'Eroare necunoscută'}`);
+    const data = await response.json();
+    if (!data.success) {
+      throw new Error(data.error || 'Eroare la crearea utilizatorului în Firebase');
     }
+
+    // API-ul returnează uid în data.data.uid
+    const uid = data.data?.uid || data.uid;
+    if (!uid) {
+      throw new Error('Nu s-a putut obține UID-ul utilizatorului din Firebase');
+    }
+
+    return uid;
   };
 
   const addUserToBigQuery = async (userData: UserFormData, uid: string) => {

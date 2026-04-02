@@ -6,19 +6,7 @@
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuth } from 'firebase-admin/auth';
-import { initializeApp, getApps, cert } from 'firebase-admin/app';
-
-// Initialize Firebase Admin SDK
-if (getApps().length === 0) {
-  initializeApp({
-    credential: cert({
-      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-      clientEmail: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
-      privateKey: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-    }),
-  });
-}
+import { admin } from '@/lib/firebase-admin';
 
 export async function POST(request: NextRequest) {
   try {
@@ -32,7 +20,7 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    const auth = getAuth();
+    const auth = admin.auth();
 
     // Verifică dacă utilizatorul există
     try {
@@ -100,7 +88,7 @@ export async function PUT(request: NextRequest) {
       }, { status: 400 });
     }
 
-    const auth = getAuth();
+    const auth = admin.auth();
 
     // Actualizează statusul utilizatorului
     await auth.updateUser(uid, {
