@@ -160,7 +160,7 @@ const ModernUsersPage: React.FC = () => {
   // FIREBASE + BIGQUERY OPERATIONS
   // ==================================================================
 
-  const createFirebaseUser = async (email: string): Promise<string> => {
+  const createFirebaseUser = async (email: string): Promise<{ uid: string; emailSent: boolean; existing: boolean }> => {
     const response = await fetch('/api/admin/users/create-firebase', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -178,7 +178,11 @@ const ModernUsersPage: React.FC = () => {
       throw new Error('Nu s-a putut obține UID-ul utilizatorului din Firebase');
     }
 
-    return uid;
+    return {
+      uid,
+      emailSent: data.data?.emailSent || false,
+      existing: data.data?.existing || false
+    };
   };
 
   const addUserToBigQuery = async (userData: UserFormData, uid: string) => {
@@ -214,13 +218,19 @@ const ModernUsersPage: React.FC = () => {
     setIsProcessing(true);
 
     try {
-      // Step 1: Create user in Firebase
-      const uid = await createFirebaseUser(formData.email);
+      // Step 1: Create user in Firebase (sau preia UID-ul existent)
+      const firebaseResult = await createFirebaseUser(formData.email);
 
       // Step 2: Add user to BigQuery
-      await addUserToBigQuery(formData, uid);
+      await addUserToBigQuery(formData, firebaseResult.uid);
 
-      toast.success(`Utilizator ${formData.prenume} ${formData.nume} adăugat cu succes! Un email de activare a fost trimis.`);
+      if (firebaseResult.existing) {
+        toast.success(`Utilizator ${formData.prenume} ${formData.nume} adăugat cu succes! Contul Firebase exista deja.`);
+      } else if (firebaseResult.emailSent) {
+        toast.success(`Utilizator ${formData.prenume} ${formData.nume} adăugat cu succes! Email de activare trimis.`);
+      } else {
+        toast.warning(`Utilizator ${formData.prenume} ${formData.nume} adăugat, dar emailul de activare nu a putut fi trimis. Utilizatorul poate folosi "Am uitat parola" din login.`);
+      }
 
       // Reset form și refresh data
       setFormData({

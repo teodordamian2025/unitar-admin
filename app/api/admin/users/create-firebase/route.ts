@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { admin } from '@/lib/firebase-admin';
+import { sendEmail, wrapEmailHTML } from '@/lib/notifications/send-email';
 
 export async function POST(request: NextRequest) {
   try {
@@ -62,39 +63,68 @@ export async function POST(request: NextRequest) {
     console.log(`Utilizator Firebase creat cu succes: ${userRecord.uid} - ${email}`);
 
     // Generează link pentru reset password (activare cont)
+    let resetLink = '';
+    let emailSent = false;
+
     try {
-      const resetLink = await auth.generatePasswordResetLink(email, {
-        url: `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/login`
+      const appUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://admin.unitarproiect.eu';
+      resetLink = await auth.generatePasswordResetLink(email, {
+        url: `${appUrl}/login`
       });
 
       console.log(`Link reset password generat pentru ${email}`);
 
-      // În producție aici ar trebui să trimitem email-ul
-      // Pentru dev, îl returnăm în răspuns
-      return NextResponse.json({
-        success: true,
-        message: 'Utilizator creat cu succes în Firebase',
-        data: {
-          uid: userRecord.uid,
-          email: userRecord.email,
-          resetLink: resetLink // Remove in production
-        }
+      // Trimite emailul de activare cont
+      const emailHtml = wrapEmailHTML(`
+        <p>Buna,</p>
+        <p>Un cont nou a fost creat pentru tine in platforma <strong>UNITAR PROIECT</strong>.</p>
+        <p>Pentru a-ti activa contul si a seta parola, apasa pe butonul de mai jos:</p>
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${resetLink}"
+             style="background-color: #2563eb; color: white; padding: 14px 32px;
+                    text-decoration: none; border-radius: 8px; font-weight: 600;
+                    font-size: 16px; display: inline-block;">
+            Activeaza Contul
+          </a>
+        </div>
+        <p style="color: #6b7280; font-size: 14px;">
+          Daca butonul nu functioneaza, copiaza acest link in browser:<br/>
+          <a href="${resetLink}" style="color: #2563eb; word-break: break-all;">${resetLink}</a>
+        </p>
+        <p style="color: #6b7280; font-size: 14px;">
+          Dupa activare, te poti autentifica la: <a href="${appUrl}/login">${appUrl}/login</a>
+        </p>
+      `, 'Activare cont UNITAR PROIECT');
+
+      const emailResult = await sendEmail({
+        to: email,
+        subject: 'Activare cont UNITAR PROIECT',
+        html: emailHtml,
+        text: `Un cont nou a fost creat pentru tine in platforma UNITAR PROIECT. Activeaza-ti contul accesand: ${resetLink}`,
       });
+
+      emailSent = emailResult.success;
+      if (emailResult.success) {
+        console.log(`Email de activare trimis cu succes catre ${email}`);
+      } else {
+        console.error(`Eroare la trimiterea emailului de activare:`, emailResult.error);
+      }
 
     } catch (linkError) {
       console.error('Eroare la generarea link-ului de reset:', linkError);
-
-      // Utilizatorul a fost creat, dar nu s-a putut genera link-ul
-      return NextResponse.json({
-        success: true,
-        message: 'Utilizator creat, dar nu s-a putut genera link-ul de activare',
-        data: {
-          uid: userRecord.uid,
-          email: userRecord.email
-        },
-        warning: 'Utilizatorul va trebui să folosească "Forgot Password" din pagina de login'
-      });
     }
+
+    return NextResponse.json({
+      success: true,
+      message: emailSent
+        ? 'Utilizator creat cu succes. Email de activare trimis.'
+        : 'Utilizator creat, dar emailul de activare nu a putut fi trimis. Utilizatorul poate folosi "Am uitat parola" din pagina de login.',
+      data: {
+        uid: userRecord.uid,
+        email: userRecord.email,
+        emailSent
+      }
+    });
 
   } catch (error: any) {
     console.error('Eroare la crearea utilizatorului Firebase:', error);
