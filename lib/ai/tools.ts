@@ -16,13 +16,13 @@ const allTools: ToolDefinition[] = [
   // ==================== PROIECTE ====================
   {
     name: 'list_projects',
-    description: 'Listează sau caută proiecte. Returnează proiecte cu ID, denumire, client, status, valoare, termene, responsabili și statusuri (predare, contract, facturare, achitare). Folosește acest tool când utilizatorul întreabă despre proiecte, vrea o listă de proiecte, sau caută un proiect specific.',
+    description: 'Listează sau caută proiecte. Returnează proiecte cu ID, denumire, client, status, valoare, termene (Data_Final), responsabili și statusuri (predare, contract, facturare, achitare). Folosește acest tool când utilizatorul întreabă despre proiecte, vrea o listă de proiecte, sau caută un proiect specific. IMPORTANT: ID-urile proiectelor sunt texte libere (ex: "Hala Condor - Viorel Spiridon", "STS-pilon IASI"), NU coduri numerice. Când utilizatorul menționează un proiect după nume, folosește search cu cuvinte cheie din numele proiectului. Dacă nu găsești la prima căutare, încearcă cu termeni mai scurți sau parțiali.',
     input_schema: {
       type: 'object',
       properties: {
         search: {
           type: 'string',
-          description: 'Termen de căutare - caută în ID proiect, denumire, client, adresă'
+          description: 'Termen de căutare - caută în ID proiect, denumire, client, adresă. Folosește cuvinte cheie scurte pentru rezultate mai bune (ex: "Condor", "STS", "pilon IASI")'
         },
         status: {
           type: 'string',
@@ -88,7 +88,7 @@ const allTools: ToolDefinition[] = [
       properties: {
         proiect_id: {
           type: 'string',
-          description: 'ID-ul proiectului (ex: "P2025001")'
+          description: 'ID-ul proiectului - text liber, nu cod numeric (ex: "Hala Condor - Viorel Spiridon"). Obține-l din rezultatele list_projects.'
         },
         status: {
           type: 'string',
@@ -194,7 +194,7 @@ const allTools: ToolDefinition[] = [
         },
         proiect_id: {
           type: 'string',
-          description: 'ID-ul proiectului (ex: "P2025001")'
+          description: 'ID-ul proiectului - text liber, nu cod numeric (ex: "Hala Condor - Viorel Spiridon"). Obține-l din rezultatele list_projects.'
         },
         data_lucru: {
           type: 'string',
@@ -215,7 +215,7 @@ const allTools: ToolDefinition[] = [
       properties: {
         proiect_id: {
           type: 'string',
-          description: 'ID-ul proiectului (ex: "P2025001")'
+          description: 'ID-ul proiectului - text liber, nu cod numeric (ex: "Hala Condor - Viorel Spiridon"). Obține-l din rezultatele list_projects.'
         },
         sarcina_id: {
           type: 'string',
@@ -247,7 +247,7 @@ const allTools: ToolDefinition[] = [
       properties: {
         proiect_id: {
           type: 'string',
-          description: 'ID-ul proiectului (ex: "P2025001")'
+          description: 'ID-ul proiectului - text liber, nu cod numeric (ex: "Hala Condor - Viorel Spiridon"). Obține-l din rezultatele list_projects.'
         },
         tip_proiect: {
           type: 'string',
@@ -270,7 +270,7 @@ const allTools: ToolDefinition[] = [
       properties: {
         proiect_id: {
           type: 'string',
-          description: 'ID-ul proiectului (ex: "P2025001")'
+          description: 'ID-ul proiectului - text liber, nu cod numeric (ex: "Hala Condor - Viorel Spiridon"). Obține-l din rezultatele list_projects.'
         },
         comentariu: {
           type: 'string',
@@ -834,7 +834,7 @@ const allTools: ToolDefinition[] = [
         },
         entity_id: {
           type: 'string',
-          description: 'ID-ul entității asociate, ex: "P2025001" (opțional)'
+          description: 'ID-ul entității asociate (opțional)'
         },
         tags: {
           type: 'string',

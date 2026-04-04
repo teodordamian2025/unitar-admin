@@ -66,7 +66,7 @@ export async function executeTool(
         for (const p of projects) {
           const valoare = p.Valoare_Estimata ? formatNumber(p.Valoare_Estimata) : '-';
           const moneda = p.moneda || 'RON';
-          const dataFin = formatDate(p.Data_Finalizare);
+          const dataFin = formatDate(p.Data_Final);
           result += `- ${p.ID_Proiect} | ${p.Denumire} | Client: ${p.Client || '-'} | Status: ${p.Status || '-'} | Valoare: ${valoare} ${moneda} | Termen: ${dataFin}\n`;
         }
         return result;
