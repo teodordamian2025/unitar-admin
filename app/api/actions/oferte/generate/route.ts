@@ -108,14 +108,8 @@ function normalizeXmlRuns(xml: string): string {
 
 /**
  * Proceseaza placeholder-urile specifice ofertelor in XML-ul DOCX.
- *
- * Template-urile folosesc:
- * - ____/____ pentru numar inregistrare (data format DD/MM)
- * - ___________ EUR + TVA (si variante) pentru pret
- * - Denumire (standalone) pentru numele beneficiarului
- * - [Se completeaza...] pentru sectiuni descriptive
- * - ___ zile lucratoare pentru termen
- * - Adresa pentru adresa proiect
+ * Gestioneaza inlocuirile pe text inline (in interiorul <w:t> tags),
+ * nu doar standalone tags.
  */
 function processOfertaPlaceholders(xml: string, data: any): string {
   let processed = normalizeXmlRuns(xml);
@@ -126,48 +120,138 @@ function processOfertaPlaceholders(xml: string, data: any): string {
   const month = dataOferta.includes('-') ? dataOferta.split('-')[1] : dataOferta.split('.')[1];
   const year = dataOferta.includes('-') ? dataOferta.split('-')[0] : dataOferta.split('.')[2];
 
-  // 1. Numar inregistrare: ____/____ -> numar_oferta/luna
-  // Pattern in text extras: variante de underscores cu /
-  processed = processed.replace(/_{3,}\s*\/\s*_{3,}/g, `${data.numar_oferta || '____'}/${day || '__'}.${month || '__'}.${year || '____'}`);
+  // Parse detalii_tehnice JSON
+  let detalii: any = {};
+  if (data.detalii_tehnice) {
+    try { detalii = JSON.parse(data.detalii_tehnice); } catch { /* ignore */ }
+  }
+
+  // 1. Numar inregistrare: ____/____ sau ....../.............
+  processed = processed.replace(/[_.]{3,}\s*\/\s*[_.]{3,}/g, `${data.numar_oferta || '____'}/${day || '__'}.${month || '__'}.${year || '____'}`);
 
   // 2. Pret: ___________ EUR + TVA si variante
-  // Cautam patterns cu underscores urmate de EUR/RON/USD + TVA
   const valoareStr = data.valoare ? data.valoare.toLocaleString('ro-RO', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) : '____';
   const monedaStr = data.moneda || 'EUR';
-
-  // Variante de pret cu underscores (diferite lungimi)
-  processed = processed.replace(/_{3,}\]?\s*(EUR|RON|USD)\s*\+\s*TVA/gi, `${valoareStr} ${monedaStr} + TVA`);
-  processed = processed.replace(/_{3,}\s*(EUR|RON|USD)/gi, `${valoareStr} ${monedaStr}`);
-  // Pattern cu doar ____ (fara moneda, pt Statie Electrica care are ____ scurt)
-  // Doar inlocuim daca e in context de pret (langa "lei", "euro", etc.)
+  processed = processed.replace(/[_.]{3,}\]?\s*(EUR|RON|USD)\s*\+\s*TVA/gi, `${valoareStr} ${monedaStr} + TVA`);
+  processed = processed.replace(/[_.]{3,}\s*(EUR|RON|USD)/gi, `${valoareStr} ${monedaStr}`);
 
   // 3. Termen executie: ___ zile lucratoare
   const termenStr = data.termen_executie || '30';
-  processed = processed.replace(/_{3,}\s*zile\s*lucr[aă]toare/gi, `${termenStr} zile lucratoare`);
+  processed = processed.replace(/[_.]{3,}\s*zile\s*lucr[aă]toare/gi, `${termenStr} zile lucratoare`);
 
-  // 4. Beneficiar "Denumire" - inlocuim standalone Denumire cu numele clientului
-  // Cautam "Denumire" care apare ca text standalone (nu parte din alt cuvant)
-  // In XML, textul e in <w:t> tags, asa ca cautam pattern-ul
-  if (data.client_nume) {
-    // Inlocuim "Denumire" standalone (ca beneficiar) - doar prima aparitie dupa "BENEFICIAR" sau "client"
+  // 4. Titlu - Tipul cladirii si Adresa/Localitate
+  // Pattern: "Construcție nouă: Tipul clădirii — Adresă/Localitate"
+  // sau "Consolidare Tipul clădirii — Adresă/Localitate"
+  const tipCladire = detalii.tip_cladire ? escapeXml(detalii.tip_cladire) : 'Tipul cl\u0103dirii';
+  const adresaProiect = data.proiect_adresa ? escapeXml(data.proiect_adresa) : 'Adres\u0103/Localitate';
+  // Replace "Tipul clădirii — Adresă/Localitate" in various contexts
+  processed = processed.replace(
+    /Tipul cl[aă]dirii\s*[—–-]\s*Adres[aă]\/Localitate/g,
+    `${tipCladire} \u2014 ${adresaProiect}`
+  );
+
+  // 5. Faza si Beneficiar - inlocuire in text inline
+  // Pattern: "Faza: DTAC / PT+DE / DTAC+PT+DE  |  Beneficiar: Denumire"
+  // sau "Faza: DALI / PT+DE / DALI+PT+DE" pe linie separata + "Beneficiar: Denumire" pe alta
+  const fazaText = detalii.faza_proiectare || '';
+  const clientNume = data.client_nume ? escapeXml(data.client_nume) : '';
+
+  // Constructii noi pattern - faza + beneficiar pe aceeasi linie
+  if (fazaText && clientNume) {
     processed = processed.replace(
-      /(<w:t[^>]*>)(Denumire)(<\/w:t>)/gi,
-      `$1${escapeXml(data.client_nume)}$3`
+      /Faza:\s*DTAC\s*\/\s*PT\+DE\s*\/\s*DTAC\+PT\+DE\s*\|\s*Beneficiar:\s*Denumire/g,
+      `Faza: ${escapeXml(fazaText)}  |  Beneficiar: ${clientNume}`
+    );
+  } else if (fazaText) {
+    processed = processed.replace(
+      /Faza:\s*DTAC\s*\/\s*PT\+DE\s*\/\s*DTAC\+PT\+DE/g,
+      `Faza: ${escapeXml(fazaText)}`
     );
   }
 
-  // 5. Adresa proiect
+  // Consolidari pattern - "Faza: DALI" standalone
+  if (fazaText) {
+    processed = processed.replace(
+      /Faza:\s*DALI\s*\/\s*PT\+DE\s*\/\s*DALI\+PT\+DE/g,
+      `Faza: ${escapeXml(fazaText)}`
+    );
+    // Also handle already-filled "Faza: DALI" standalone (consolidari template)
+    processed = processed.replace(
+      /(<w:t[^>]*>)Faza:\s*DALI(<\/w:t>)/g,
+      `$1Faza: ${escapeXml(fazaText)}$2`
+    );
+  }
+
+  // Statie electrica pattern
+  if (fazaText) {
+    processed = processed.replace(
+      /Faza:\s*DTAC,\s*PT,\s*DE/g,
+      `Faza: ${escapeXml(fazaText)}`
+    );
+  }
+
+  // Beneficiar: Denumire - replace in any context (within longer text or standalone)
+  if (clientNume) {
+    // Within longer text (e.g., "... Beneficiar: Denumire")
+    processed = processed.replace(
+      /Beneficiar:\s*Denumire/g,
+      `Beneficiar: ${clientNume}`
+    );
+    // Standalone "Denumire" in w:t tag (for templates like statie_electrica)
+    processed = processed.replace(
+      /(<w:t[^>]*>)Denumire(<\/w:t>)/g,
+      `$1${clientNume}$2`
+    );
+    // "Denumire monument" pattern for expertiza_monument
+    processed = processed.replace(
+      /Denumire monument/g,
+      clientNume
+    );
+  }
+
+  // 6. Adresa standalone in w:t (for templates that have it standalone)
   if (data.proiect_adresa) {
     processed = processed.replace(
-      /(<w:t[^>]*>)(Adresa)(<\/w:t>)/g,
-      (match, before, text, after) => {
-        // Doar inlocuim "Adresa" standalone, nu "Adresa:" sau parte din alte cuvinte
-        return `${before}${escapeXml(data.proiect_adresa)}${after}`;
-      }
+      /(<w:t[^>]*>)Adresa(<\/w:t>)/g,
+      `$1${escapeXml(data.proiect_adresa)}$2`
     );
   }
 
-  // 6. Sectiuni [Se completeaza...] - inlocuim cu descrierea proiectului
+  // 7. Scop expertiza (expertiza_tehnica)
+  if (detalii.scop_expertiza) {
+    processed = processed.replace(
+      /evaluare seismic[aă]\s*\/\s*pre-interven[tț]ie\s*\/\s*litigiu\s*\/\s*v[aâ]nzare-cump[aă]rare/gi,
+      escapeXml(detalii.scop_expertiza)
+    );
+  }
+
+  // 8. Cod LMI (expertiza monument) - replace "cod" standalone
+  if (detalii.cod_lmi) {
+    processed = processed.replace(
+      /(<w:t[^>]*>)cod(<\/w:t>)/gi,
+      `$1${escapeXml(detalii.cod_lmi)}$2`
+    );
+  }
+
+  // 9. Categorie monument A / B
+  if (detalii.categorie_monument) {
+    processed = processed.replace(
+      /Categorie:\s*A\s*\/\s*B/g,
+      `Categorie: ${escapeXml(detalii.categorie_monument)}`
+    );
+  }
+
+  // 10. Sectiunea 1.1 - Descriere lucrare
+  // Constructii noi: "Se completează cu tipul clădirii, regimul de înălțime..."
+  if (data.proiect_descriere) {
+    // Constructii noi description placeholder
+    processed = processed.replace(
+      /Se completează cu tipul clădirii, regimul de înălțime, materialul structurii, suprafața construită aproximativă și orice specificații tehnice relevante primite de la beneficiar sau arhitect\./g,
+      escapeXml(data.proiect_descriere)
+    );
+  }
+
+  // Expertiza/other templates: [Se completează cu: ...]
   if (data.proiect_descriere) {
     processed = processed.replace(
       /\[Se completeaz[aă][^\]]*\]/gi,
@@ -175,11 +259,81 @@ function processOfertaPlaceholders(xml: string, data: any): string {
     );
   }
 
-  // 7. Cod LMI (pentru expertiza monument)
-  if (data.cod_lmi) {
+  // 11. Structura propusa (constructii noi)
+  if (detalii.structura_propusa) {
     processed = processed.replace(
-      /(<w:t[^>]*>)(cod)(<\/w:t>)/gi,
-      `$1${escapeXml(data.cod_lmi)}$3`
+      /Ex:\s*Structur[aă] din beton armat cu cadre \/ pere[tț]i structurali, funda[tț]ii pe radier general \/ funda[tț]ii izolate pe pilo[tț]i, regim S\+P\+4E, Sc ≈ 500 mp\/nivel\./g,
+      escapeXml(detalii.structura_propusa)
+    );
+  }
+
+  // 12. Tip interventie (consolidari) - replace placeholder
+  if (detalii.tip_interventie) {
+    // Replace "[Se completeaza cu tipul interventiei]" bracket pattern
+    processed = processed.replace(
+      /\[Se completeaz[aă] cu tipul interven[tț]iei\]/gi,
+      escapeXml(detalii.tip_interventie)
+    );
+    // Replace "Consolidare" in title line (standalone in w:t after xml:space="preserve")
+    processed = processed.replace(
+      /(<w:t[^>]*>)\s*Consolidare\s*(<\/w:t>)/g,
+      (match, before, after) => {
+        return `${before} ${escapeXml(detalii.tip_interventie)} ${after}`;
+      }
+    );
+  }
+
+  // 12b. Consolidari description placeholder
+  if (data.proiect_descriere) {
+    processed = processed.replace(
+      /Se completeaza cu descrierea cladirii existente[^.]*\./gi,
+      escapeXml(data.proiect_descriere)
+    );
+    processed = processed.replace(
+      /Se completeaza cu descrierea interventiei propuse\./gi,
+      escapeXml(data.proiect_descriere)
+    );
+  }
+
+  // 13. Grafic de plata - replace percentages sequentially
+  const t1 = detalii.grafic_plata_t1 ?? 40;
+  const t2 = detalii.grafic_plata_t2 ?? 40;
+  const t3 = detalii.grafic_plata_t3 ?? 20;
+
+  // Find "Grafic de plat" position and replace percentages after it
+  const graficIdx = processed.indexOf('Grafic de plat');
+  if (graficIdx >= 0) {
+    const beforeGrafic = processed.substring(0, graficIdx);
+    let afterGrafic = processed.substring(graficIdx);
+
+    // Replace the first 40% with T1
+    afterGrafic = afterGrafic.replace(
+      /(<w:t[^>]*>)40%(<\/w:t>)/,
+      `$1${t1}%$2`
+    );
+    // Replace the second 40% with T2
+    afterGrafic = afterGrafic.replace(
+      /(<w:t[^>]*>)40%(<\/w:t>)/,
+      `$1${t2}%$2`
+    );
+    // Replace 20% with T3
+    afterGrafic = afterGrafic.replace(
+      /(<w:t[^>]*>)20%(<\/w:t>)/,
+      `$1${t3}%$2`
+    );
+
+    processed = beforeGrafic + afterGrafic;
+  }
+
+  // 14. Proiect rezistenta DTAC / PT+DE - actualizare faza in tabelul oferta financiara
+  if (fazaText) {
+    processed = processed.replace(
+      /DTAC\s*\/\s*PT\+DE\s*pentru construc[tț]ie nou[aă]/g,
+      `${escapeXml(fazaText)} pentru construc\u021Bie nou\u0103`
+    );
+    processed = processed.replace(
+      /consolidare\s*DALI/gi,
+      `consolidare ${escapeXml(fazaText)}`
     );
   }
 
@@ -254,6 +408,7 @@ export async function POST(request: NextRequest) {
       moneda: oferta.moneda || 'EUR',
       termen_executie: oferta.termen_executie || '30',
       observatii: oferta.observatii || '',
+      detalii_tehnice: oferta.detalii_tehnice || '',
     };
 
     // 4. Procesare template DOCX cu JSZip

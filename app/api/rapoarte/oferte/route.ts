@@ -226,6 +226,7 @@ export async function POST(request: NextRequest) {
       tip_oferta, proiect_denumire, proiect_descriere, proiect_adresa,
       valoare, moneda, curs_valutar, valoare_ron,
       data_expirare, observatii, note_interne, termen_executie,
+      detalii_tehnice,
       creat_de, creat_de_nume
     } = body;
 
@@ -271,7 +272,7 @@ export async function POST(request: NextRequest) {
       INSERT INTO ${TABLE_OFERTE}
       (id, numar_oferta, serie_oferta, tip_oferta, client_id, client_nume, client_email, client_telefon, client_cui, client_adresa,
        proiect_denumire, proiect_descriere, proiect_adresa, valoare, moneda, curs_valutar, valoare_ron,
-       status, data_oferta, data_expirare, observatii, note_interne, termen_executie,
+       status, data_oferta, data_expirare, observatii, note_interne, termen_executie, detalii_tehnice,
        creat_de, creat_de_nume, data_creare, data_actualizare, activ)
       VALUES
       (${escapeValue(id)}, ${escapeValue(numar_oferta)}, 'OF', ${escapeValue(tip_oferta || null)},
@@ -281,6 +282,7 @@ export async function POST(request: NextRequest) {
        ${valoare || 0}, ${escapeValue(moneda || 'EUR')}, ${curs_valutar || 'NULL'}, ${valoare_ron || 'NULL'},
        'Draft', ${formatDateLiteral(dataOferta)}, ${formatDateLiteral(dataExpirareCalc)},
        ${escapeValue(observatii || null)}, ${escapeValue(note_interne || null)}, ${escapeValue(termen_executie || null)},
+       ${escapeValue(detalii_tehnice || null)},
        ${escapeValue(creat_de || null)}, ${escapeValue(creat_de_nume || null)},
        TIMESTAMP('${now}'), TIMESTAMP('${now}'), true)
     `;
@@ -354,6 +356,7 @@ export async function PUT(request: NextRequest) {
       path_fisier: 'path_fisier',
       proiect_id_legat: 'proiect_id_legat',
       motiv_refuz: 'motiv_refuz',
+      detalii_tehnice: 'detalii_tehnice',
     };
 
     for (const [bodyKey, dbColumn] of Object.entries(fieldMap)) {

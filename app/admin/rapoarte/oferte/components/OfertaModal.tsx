@@ -8,6 +8,22 @@
 
 import { useState, useEffect } from 'react';
 
+interface DetaliiTehnice {
+  faza_proiectare?: string;
+  tip_cladire?: string;
+  regim_inaltime?: string;
+  material_structura?: string;
+  suprafata_construita?: string;
+  structura_propusa?: string;
+  tip_interventie?: string;
+  scop_expertiza?: string;
+  cod_lmi?: string;
+  categorie_monument?: string;
+  grafic_plata_t1?: number;
+  grafic_plata_t2?: number;
+  grafic_plata_t3?: number;
+}
+
 interface Oferta {
   id: string;
   numar_oferta: string;
@@ -29,6 +45,7 @@ interface Oferta {
   observatii: string;
   note_interne: string;
   termen_executie: string;
+  detalii_tehnice?: string;
 }
 
 interface OfertaModalProps {
@@ -50,6 +67,32 @@ const TIP_OPTIONS = [
 ];
 
 const MONEDA_OPTIONS = ['EUR', 'RON', 'USD'];
+
+const FAZA_OPTIONS: Record<string, { value: string; label: string }[]> = {
+  constructii_noi: [
+    { value: '', label: 'Selecteaza faza' },
+    { value: 'DTAC', label: 'DTAC' },
+    { value: 'PT+DE', label: 'PT+DE' },
+    { value: 'DTAC+PT+DE', label: 'DTAC+PT+DE' },
+  ],
+  consolidari: [
+    { value: '', label: 'Selecteaza faza' },
+    { value: 'DALI', label: 'DALI' },
+    { value: 'PT+DE', label: 'PT+DE' },
+    { value: 'DALI+PT+DE', label: 'DALI+PT+DE' },
+  ],
+  statie_electrica: [
+    { value: '', label: 'Selecteaza faza' },
+    { value: 'DTAC', label: 'DTAC' },
+    { value: 'PT', label: 'PT' },
+    { value: 'DE', label: 'DE' },
+  ],
+};
+
+function parseDetaliiTehnice(json?: string): DetaliiTehnice {
+  if (!json) return {};
+  try { return JSON.parse(json); } catch { return {}; }
+}
 
 function showToast(message: string, type: 'success' | 'error' | 'info' = 'info') {
   const toast = document.createElement('div');
@@ -73,6 +116,8 @@ function formatDateInput(dateVal: any): string {
 export default function OfertaModal({ isOpen, onClose, onSuccess, oferta, userId, userName }: OfertaModalProps) {
   const isEdit = !!oferta;
 
+  const existingDetalii = parseDetaliiTehnice(oferta?.detalii_tehnice);
+
   const [form, setForm] = useState({
     tip_oferta: oferta?.tip_oferta || '',
     client_id: oferta?.client_id || '',
@@ -92,6 +137,20 @@ export default function OfertaModal({ isOpen, onClose, onSuccess, oferta, userId
     observatii: oferta?.observatii || '',
     note_interne: oferta?.note_interne || '',
     termen_executie: oferta?.termen_executie || '',
+    // Detalii tehnice
+    faza_proiectare: existingDetalii.faza_proiectare || '',
+    tip_cladire: existingDetalii.tip_cladire || '',
+    regim_inaltime: existingDetalii.regim_inaltime || '',
+    material_structura: existingDetalii.material_structura || '',
+    suprafata_construita: existingDetalii.suprafata_construita || '',
+    structura_propusa: existingDetalii.structura_propusa || '',
+    tip_interventie: existingDetalii.tip_interventie || '',
+    scop_expertiza: existingDetalii.scop_expertiza || '',
+    cod_lmi: existingDetalii.cod_lmi || '',
+    categorie_monument: existingDetalii.categorie_monument || '',
+    grafic_plata_t1: existingDetalii.grafic_plata_t1 ?? 40,
+    grafic_plata_t2: existingDetalii.grafic_plata_t2 ?? 40,
+    grafic_plata_t3: existingDetalii.grafic_plata_t3 ?? 20,
   });
 
   const [saving, setSaving] = useState(false);
@@ -138,9 +197,33 @@ export default function OfertaModal({ isOpen, onClose, onSuccess, oferta, userId
 
     setSaving(true);
     try {
+      // Pack detalii_tehnice fields into JSON
+      const detalii_tehnice = JSON.stringify({
+        faza_proiectare: form.faza_proiectare,
+        tip_cladire: form.tip_cladire,
+        regim_inaltime: form.regim_inaltime,
+        material_structura: form.material_structura,
+        suprafata_construita: form.suprafata_construita,
+        structura_propusa: form.structura_propusa,
+        tip_interventie: form.tip_interventie,
+        scop_expertiza: form.scop_expertiza,
+        cod_lmi: form.cod_lmi,
+        categorie_monument: form.categorie_monument,
+        grafic_plata_t1: form.grafic_plata_t1,
+        grafic_plata_t2: form.grafic_plata_t2,
+        grafic_plata_t3: form.grafic_plata_t3,
+      });
+
+      // Exclude individual detalii fields from API payload
+      const { faza_proiectare, tip_cladire, regim_inaltime, material_structura, suprafata_construita,
+              structura_propusa, tip_interventie, scop_expertiza, cod_lmi, categorie_monument,
+              grafic_plata_t1, grafic_plata_t2, grafic_plata_t3, ...formData } = form;
+
       const url = '/api/rapoarte/oferte';
       const method = isEdit ? 'PUT' : 'POST';
-      const body = isEdit ? { id: oferta!.id, ...form } : { ...form, creat_de: userId, creat_de_nume: userName };
+      const body = isEdit
+        ? { id: oferta!.id, ...formData, detalii_tehnice }
+        : { ...formData, detalii_tehnice, creat_de: userId, creat_de_nume: userName };
 
       const res = await fetch(url, {
         method,
@@ -195,7 +278,7 @@ export default function OfertaModal({ isOpen, onClose, onSuccess, oferta, userId
         background: 'white',
         borderRadius: '20px',
         boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
-        maxWidth: '900px',
+        maxWidth: '1000px',
         width: '100%',
         maxHeight: '90vh',
         overflowY: 'auto' as const
@@ -305,6 +388,93 @@ export default function OfertaModal({ isOpen, onClose, onSuccess, oferta, userId
             </div>
           </div>
 
+          {/* Detalii Tehnice Document - conditional on tip_oferta */}
+          {form.tip_oferta && (
+            <div style={{ marginBottom: '1.5rem', padding: '1.5rem', background: '#f0f4ff', borderRadius: '12px', border: '1px solid #d0d9f0' }}>
+              <h3 style={{ margin: '0 0 1rem', fontSize: '16px', fontWeight: '600', color: '#2c3e50' }}>Detalii Tehnice Document</h3>
+
+              {/* Faza proiectare - for constructii_noi, consolidari, statie_electrica */}
+              {FAZA_OPTIONS[form.tip_oferta] && (
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={labelStyle}>Faza de proiectare</label>
+                  <select value={form.faza_proiectare} onChange={e => handleChange('faza_proiectare', e.target.value)} style={inputStyle}>
+                    {FAZA_OPTIONS[form.tip_oferta].map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                  </select>
+                </div>
+              )}
+
+              {/* Constructii noi - fields */}
+              {form.tip_oferta === 'constructii_noi' && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+                  <div>
+                    <label style={labelStyle}>Tip cladire</label>
+                    <input type="text" value={form.tip_cladire} onChange={e => handleChange('tip_cladire', e.target.value)} style={inputStyle} placeholder="Ex: bloc locuinte, cladire birouri" />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Regim de inaltime</label>
+                    <input type="text" value={form.regim_inaltime} onChange={e => handleChange('regim_inaltime', e.target.value)} style={inputStyle} placeholder="Ex: S+P+4E, P+1E+M" />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Material structura</label>
+                    <input type="text" value={form.material_structura} onChange={e => handleChange('material_structura', e.target.value)} style={inputStyle} placeholder="Ex: beton armat cu cadre" />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Suprafata construita</label>
+                    <input type="text" value={form.suprafata_construita} onChange={e => handleChange('suprafata_construita', e.target.value)} style={inputStyle} placeholder="Ex: 500 mp/nivel" />
+                  </div>
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <label style={labelStyle}>Structura propusa (descriere detaliata)</label>
+                    <textarea value={form.structura_propusa} onChange={e => handleChange('structura_propusa', e.target.value)} style={{ ...inputStyle, minHeight: '70px', resize: 'vertical' as const }} placeholder="Ex: Structura din beton armat cu cadre / pereti structurali, fundatii pe radier general, regim S+P+4E, Sc ≈ 500 mp/nivel." />
+                  </div>
+                </div>
+              )}
+
+              {/* Consolidari - fields */}
+              {form.tip_oferta === 'consolidari' && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <label style={labelStyle}>Tip interventie structurala</label>
+                    <input type="text" value={form.tip_interventie} onChange={e => handleChange('tip_interventie', e.target.value)} style={inputStyle} placeholder="Ex: consolidare fundatii, mansardare si consolidare, consolidare zidarie" />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Tip cladire</label>
+                    <input type="text" value={form.tip_cladire} onChange={e => handleChange('tip_cladire', e.target.value)} style={inputStyle} placeholder="Ex: bloc locuinte, casa unifamiliala" />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Regim de inaltime</label>
+                    <input type="text" value={form.regim_inaltime} onChange={e => handleChange('regim_inaltime', e.target.value)} style={inputStyle} placeholder="Ex: S+P+2E, P+M" />
+                  </div>
+                </div>
+              )}
+
+              {/* Expertiza tehnica - fields */}
+              {form.tip_oferta === 'expertiza_tehnica' && (
+                <div>
+                  <label style={labelStyle}>Scopul expertizei</label>
+                  <input type="text" value={form.scop_expertiza} onChange={e => handleChange('scop_expertiza', e.target.value)} style={inputStyle} placeholder="Ex: evaluare seismica, pre-interventie, litigiu, vanzare-cumparare" />
+                </div>
+              )}
+
+              {/* Expertiza monument - fields */}
+              {form.tip_oferta === 'expertiza_monument' && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+                  <div>
+                    <label style={labelStyle}>Cod LMI</label>
+                    <input type="text" value={form.cod_lmi} onChange={e => handleChange('cod_lmi', e.target.value)} style={inputStyle} placeholder="Ex: B-II-m-A-17885" />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Categorie monument</label>
+                    <select value={form.categorie_monument} onChange={e => handleChange('categorie_monument', e.target.value)} style={inputStyle}>
+                      <option value="">Selecteaza</option>
+                      <option value="A">A - importanta nationala</option>
+                      <option value="B">B - importanta locala</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Financiar section */}
           <div style={{ marginBottom: '1.5rem', padding: '1.5rem', background: '#f8f9fa', borderRadius: '12px' }}>
             <h3 style={{ margin: '0 0 1rem', fontSize: '16px', fontWeight: '600', color: '#2c3e50' }}>Date Financiare</h3>
@@ -321,13 +491,46 @@ export default function OfertaModal({ isOpen, onClose, onSuccess, oferta, userId
                 </select>
               </div>
               <div>
-                <label style={labelStyle}>Termen executie</label>
-                <input type="text" value={form.termen_executie} onChange={e => handleChange('termen_executie', e.target.value)} style={inputStyle} placeholder="Ex: 30 zile lucratoare" />
+                <label style={labelStyle}>Termen executie (zile lucratoare)</label>
+                <input type="text" value={form.termen_executie} onChange={e => handleChange('termen_executie', e.target.value)} style={inputStyle} placeholder="Ex: 30" />
               </div>
               <div>
                 <label style={labelStyle}>Data expirare oferta</label>
                 <input type="date" value={form.data_expirare} onChange={e => handleChange('data_expirare', e.target.value)} style={inputStyle} />
               </div>
+            </div>
+
+            {/* Grafic de plata */}
+            <div style={{ marginTop: '1rem', padding: '1rem', background: 'white', borderRadius: '8px', border: '1px solid #e0e0e0' }}>
+              <label style={{ ...labelStyle, marginBottom: '8px' }}>Grafic de plata (% din contract)</label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ ...labelStyle, fontSize: '11px' }}>T1 - La semnare contract</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <input type="number" value={form.grafic_plata_t1} onChange={e => handleChange('grafic_plata_t1', parseInt(e.target.value) || 0)} style={{ ...inputStyle, textAlign: 'center' as const }} min="0" max="100" />
+                    <span style={{ fontSize: '14px', color: '#666' }}>%</span>
+                  </div>
+                </div>
+                <div>
+                  <label style={{ ...labelStyle, fontSize: '11px' }}>T2 - Predare electronica</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <input type="number" value={form.grafic_plata_t2} onChange={e => handleChange('grafic_plata_t2', parseInt(e.target.value) || 0)} style={{ ...inputStyle, textAlign: 'center' as const }} min="0" max="100" />
+                    <span style={{ fontSize: '14px', color: '#666' }}>%</span>
+                  </div>
+                </div>
+                <div>
+                  <label style={{ ...labelStyle, fontSize: '11px' }}>T3 - Predare finala</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <input type="number" value={form.grafic_plata_t3} onChange={e => handleChange('grafic_plata_t3', parseInt(e.target.value) || 0)} style={{ ...inputStyle, textAlign: 'center' as const }} min="0" max="100" />
+                    <span style={{ fontSize: '14px', color: '#666' }}>%</span>
+                  </div>
+                </div>
+              </div>
+              {(form.grafic_plata_t1 + form.grafic_plata_t2 + form.grafic_plata_t3) !== 100 && (
+                <div style={{ marginTop: '6px', fontSize: '12px', color: '#e74c3c', fontWeight: '500' }}>
+                  Total: {form.grafic_plata_t1 + form.grafic_plata_t2 + form.grafic_plata_t3}% (trebuie sa fie 100%)
+                </div>
+              )}
             </div>
           </div>
 
