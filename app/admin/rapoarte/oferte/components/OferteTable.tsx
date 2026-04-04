@@ -122,6 +122,7 @@ export default function OferteTable({ searchParams, onKpiLoaded, refreshKey, onR
   const [istoricOferta, setIstoricOferta] = useState<Oferta | null>(null);
   const [linkingOferta, setLinkingOferta] = useState<Oferta | null>(null);
   const [generatingId, setGeneratingId] = useState<string | null>(null);
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
 
   const fetchOferte = useCallback(async () => {
     setLoading(true);
@@ -152,7 +153,7 @@ export default function OferteTable({ searchParams, onKpiLoaded, refreshKey, onR
 
   // Close dropdown on outside click
   useEffect(() => {
-    const handler = () => setOpenDropdown(null);
+    const handler = () => { setOpenDropdown(null); setDropdownPos(null); };
     document.addEventListener('click', handler);
     return () => document.removeEventListener('click', handler);
   }, []);
@@ -330,9 +331,19 @@ export default function OferteTable({ searchParams, onKpiLoaded, refreshKey, onR
                         <span style={{ color: '#ccc', fontSize: '12px' }}>-</span>
                       )}
                     </td>
-                    <td style={{ padding: '12px 16px', position: 'relative' as const }}>
+                    <td style={{ padding: '12px 16px' }}>
                       <button
-                        onClick={(e) => { e.stopPropagation(); setOpenDropdown(openDropdown === oferta.id ? null : oferta.id); }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (openDropdown === oferta.id) {
+                            setOpenDropdown(null);
+                            setDropdownPos(null);
+                          } else {
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            setDropdownPos({ top: rect.bottom + 4, left: rect.right - 200 });
+                            setOpenDropdown(oferta.id);
+                          }
+                        }}
                         style={{
                           padding: '6px 12px',
                           background: 'white',
@@ -347,11 +358,11 @@ export default function OferteTable({ searchParams, onKpiLoaded, refreshKey, onR
                         Actiuni &#9662;
                       </button>
 
-                      {openDropdown === oferta.id && (
+                      {openDropdown === oferta.id && dropdownPos && createPortal(
                         <div style={{
-                          position: 'absolute',
-                          right: '16px',
-                          top: '100%',
+                          position: 'fixed',
+                          left: `${dropdownPos.left}px`,
+                          top: `${dropdownPos.top}px`,
                           background: 'white',
                           borderRadius: '12px',
                           boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
@@ -371,7 +382,7 @@ export default function OferteTable({ searchParams, onKpiLoaded, refreshKey, onR
                           ].map((item, i) => (
                             <button
                               key={i}
-                              onClick={(e) => { e.stopPropagation(); setOpenDropdown(null); item.action(); }}
+                              onClick={(e) => { e.stopPropagation(); setOpenDropdown(null); setDropdownPos(null); item.action(); }}
                               disabled={(item as any).disabled}
                               style={{
                                 display: 'block',
@@ -395,7 +406,8 @@ export default function OferteTable({ searchParams, onKpiLoaded, refreshKey, onR
                               {(item as any).disabled && ' (se genereaza...)'}
                             </button>
                           ))}
-                        </div>
+                        </div>,
+                        document.body
                       )}
                     </td>
                   </tr>
