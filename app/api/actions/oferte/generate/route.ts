@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 import JSZip from 'jszip';
-import { readFile, writeFile, mkdir } from 'fs/promises';
+import { readFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
 
@@ -21,7 +21,6 @@ const tableSuffix = useV2Tables ? '_v2' : '';
 const TABLE_OFERTE = `\`${PROJECT_ID}.${DATASET}.Oferte${tableSuffix}\``;
 
 const TEMPLATES_DIR = path.join(process.cwd(), 'uploads', 'oferte', 'templates');
-const GENERATED_DIR = path.join(process.cwd(), 'uploads', 'oferte', 'generated');
 
 const bigquery = new BigQuery({
   projectId: PROJECT_ID,
@@ -278,30 +277,20 @@ export async function POST(request: NextRequest) {
 
     const generatedBuffer = await zip.generateAsync({ type: 'nodebuffer' });
 
-    // 5. Salvare fisier generat
-    if (!existsSync(GENERATED_DIR)) {
-      await mkdir(GENERATED_DIR, { recursive: true });
-    }
-
+    // 5. Update oferta cu sablon_folosit in BigQuery
     const fileName = `${oferta.numar_oferta || 'oferta'}.docx`.replace(/[/\\?%*:|"<>]/g, '_');
-    const filePath = path.join(GENERATED_DIR, fileName);
-    await writeFile(filePath, generatedBuffer);
-
-    // 6. Update oferta cu path_fisier si sablon_folosit
-    const relativePath = `uploads/oferte/generated/${fileName}`;
     const now = new Date().toISOString();
     await bigquery.query({
       query: `
         UPDATE ${TABLE_OFERTE}
-        SET path_fisier = ${escapeValue(relativePath)},
-            sablon_folosit = ${escapeValue(templateFile)},
+        SET sablon_folosit = ${escapeValue(templateFile)},
             data_actualizare = TIMESTAMP('${now}')
         WHERE id = '${escapeString(oferta_id)}' AND activ = true
       `,
       location: 'EU',
     });
 
-    console.log(`[OFERTA-GENERATE] Document salvat: ${filePath}`);
+    console.log(`[OFERTA-GENERATE] Document generat: ${fileName}`);
 
     // 7. Return DOCX ca response pentru download
     return new NextResponse(generatedBuffer, {
