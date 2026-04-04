@@ -13,7 +13,10 @@ const directories = [
   'uploads',
   'uploads/facturi',
   'uploads/contracte',
-  'uploads/temp'
+  'uploads/temp',
+  'uploads/oferte',
+  'uploads/oferte/templates',
+  'uploads/oferte/generated'
 ];
 
 // Creează directoarele
@@ -33,7 +36,7 @@ directories.forEach(dir => {
 });
 
 // Creează .gitkeep pentru a menține directoarele în git
-const gitkeepDirs = ['uploads/facturi', 'uploads/contracte', 'uploads/temp'];
+const gitkeepDirs = ['uploads/facturi', 'uploads/contracte', 'uploads/temp', 'uploads/oferte', 'uploads/oferte/templates', 'uploads/oferte/generated'];
 
 gitkeepDirs.forEach(dir => {
   const gitkeepPath = path.join(process.cwd(), dir, '.gitkeep');

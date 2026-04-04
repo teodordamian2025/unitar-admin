@@ -64,6 +64,7 @@ const navStructure: NavItem[] = [
       { href: '/admin/rapoarte/clienti', label: 'Clienti', icon: '👥' },
       { href: '/admin/rapoarte/contracte', label: 'Contracte', icon: '📄' },
       { href: '/admin/rapoarte/facturi', label: 'Facturi', icon: '💰' },
+      { href: '/admin/rapoarte/oferte', label: 'Oferte', icon: '📝' },
       { href: '/admin/anaf/monitoring', label: 'ANAF Monitor', icon: '📊' }
     ]
   },
