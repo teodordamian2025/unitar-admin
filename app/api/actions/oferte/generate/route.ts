@@ -283,16 +283,36 @@ function processOfertaPlaceholders(xml: string, data: any): string {
     );
   }
 
-  // 12b. Consolidari description placeholder
-  if (data.proiect_descriere) {
-    processed = processed.replace(
-      /Se completeaza cu descrierea cladirii existente[^.]*\./gi,
-      escapeXml(data.proiect_descriere)
-    );
-    processed = processed.replace(
-      /Se completeaza cu descrierea interventiei propuse\./gi,
-      escapeXml(data.proiect_descriere)
-    );
+  // 12b. Consolidari description placeholders
+  // First instance: main description (uses proiect_descriere)
+  // Second instance: under "Tipul interventiei" (uses tip_interventie or proiect_descriere)
+  {
+    const descText = data.proiect_descriere ? escapeXml(data.proiect_descriere) : '';
+    const tipIntText = detalii.tip_interventie ? escapeXml(detalii.tip_interventie) : descText;
+
+    if (descText) {
+      // Replace first occurrence only
+      processed = processed.replace(
+        /Se completeaza cu descrierea cladirii existente[^.]*\./i,
+        descText
+      );
+    }
+
+    // Replace remaining "Se completeaza cu descrierea interventiei propuse."
+    // After tip_interventie bracket was already replaced, this is the remaining one
+    if (tipIntText) {
+      processed = processed.replace(
+        /Se completeaza cu descrierea interventiei propuse\./i,
+        tipIntText
+      );
+    }
+    // If there's still a second instance, replace it too
+    if (descText) {
+      processed = processed.replace(
+        /Se completeaza cu descrierea interventiei propuse\./i,
+        descText
+      );
+    }
   }
 
   // 13. Grafic de plata - replace percentages sequentially
@@ -325,14 +345,21 @@ function processOfertaPlaceholders(xml: string, data: any): string {
     processed = beforeGrafic + afterGrafic;
   }
 
-  // 14. Proiect rezistenta DTAC / PT+DE - actualizare faza in tabelul oferta financiara
+  // 14. Proiect rezistenta - actualizare faza in tabelul oferta financiara
   if (fazaText) {
+    // Constructii noi: "DTAC / PT+DE pentru construcție nouă"
     processed = processed.replace(
       /DTAC\s*\/\s*PT\+DE\s*pentru construc[tț]ie nou[aă]/g,
       `${escapeXml(fazaText)} pentru construc\u021Bie nou\u0103`
     );
+    // Consolidari: "consolidare DALI / PT+DE / DALI+PT+DE" (full pattern)
     processed = processed.replace(
-      /consolidare\s*DALI/gi,
+      /consolidare\s+DALI\s*\/\s*PT\+DE\s*\/\s*DALI\+PT\+DE/gi,
+      `consolidare ${escapeXml(fazaText)}`
+    );
+    // Fallback: "consolidare DALI" standalone
+    processed = processed.replace(
+      /consolidare\s+DALI(?!\s*\/)/gi,
       `consolidare ${escapeXml(fazaText)}`
     );
   }
@@ -424,8 +451,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Template DOCX invalid - document.xml nu a fost gasit' }, { status: 500 });
     }
 
-    // Escapam datele pentru XML si procesam placeholder-urile
-    const escapedData = escapeDataForXml(templateData);
+    // IMPORTANT: Nu escapam detalii_tehnice (JSON string) - se parseaza intern
+    // Escapam restul datelor pentru XML
+    const { detalii_tehnice: rawDetalii, ...restData } = templateData;
+    const escapedData = escapeDataForXml(restData);
+    // Adaugam detalii_tehnice neescapat pentru JSON.parse in processOfertaPlaceholders
+    escapedData.detalii_tehnice = rawDetalii;
     const processedXml = processOfertaPlaceholders(documentXml, escapedData);
 
     zip.file('word/document.xml', processedXml);
