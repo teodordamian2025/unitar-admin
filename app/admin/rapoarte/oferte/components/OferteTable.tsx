@@ -7,7 +7,7 @@
 
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import OfertaModal from './OfertaModal';
 import OfertaStatusModal from './OfertaStatusModal';
@@ -113,6 +113,7 @@ export default function OferteTable({ searchParams, onKpiLoaded, refreshKey, onR
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState({ page: 1, per_page: 50, total: 0, total_pages: 0 });
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+  const [dropdownCoords, setDropdownCoords] = useState({ top: 0, left: 0 });
 
   // Modal states
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -122,7 +123,6 @@ export default function OferteTable({ searchParams, onKpiLoaded, refreshKey, onR
   const [istoricOferta, setIstoricOferta] = useState<Oferta | null>(null);
   const [linkingOferta, setLinkingOferta] = useState<Oferta | null>(null);
   const [generatingId, setGeneratingId] = useState<string | null>(null);
-  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
 
   const fetchOferte = useCallback(async () => {
     setLoading(true);
@@ -151,12 +151,23 @@ export default function OferteTable({ searchParams, onKpiLoaded, refreshKey, onR
     fetchOferte();
   }, [fetchOferte]);
 
-  // Close dropdown on outside click
-  useEffect(() => {
-    const handler = () => { setOpenDropdown(null); setDropdownPos(null); };
-    document.addEventListener('click', handler);
-    return () => document.removeEventListener('click', handler);
-  }, []);
+  const handleToggleDropdown = (ofertaId: string, buttonEl: HTMLButtonElement) => {
+    if (openDropdown === ofertaId) {
+      setOpenDropdown(null);
+      return;
+    }
+    const rect = buttonEl.getBoundingClientRect();
+    const dropdownHeight = 350;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    let finalTop = spaceBelow < dropdownHeight && rect.top > dropdownHeight
+      ? rect.top - dropdownHeight - 8
+      : rect.bottom + 8;
+    let finalLeft = rect.right - 220;
+    if (finalLeft < 10) finalLeft = 10;
+    if (finalLeft + 220 > window.innerWidth - 10) finalLeft = window.innerWidth - 230;
+    setDropdownCoords({ top: finalTop, left: finalLeft });
+    setOpenDropdown(ofertaId);
+  };
 
   const handleDelete = async (oferta: Oferta) => {
     if (!confirm(`Sigur doriti sa stergeti oferta ${oferta.numar_oferta}?`)) return;
@@ -333,17 +344,7 @@ export default function OferteTable({ searchParams, onKpiLoaded, refreshKey, onR
                     </td>
                     <td style={{ padding: '12px 16px' }}>
                       <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (openDropdown === oferta.id) {
-                            setOpenDropdown(null);
-                            setDropdownPos(null);
-                          } else {
-                            const rect = e.currentTarget.getBoundingClientRect();
-                            setDropdownPos({ top: rect.bottom + 4, left: rect.right - 200 });
-                            setOpenDropdown(oferta.id);
-                          }
-                        }}
+                        onClick={(e) => handleToggleDropdown(oferta.id, e.currentTarget)}
                         style={{
                           padding: '6px 12px',
                           background: 'white',
@@ -357,58 +358,6 @@ export default function OferteTable({ searchParams, onKpiLoaded, refreshKey, onR
                       >
                         Actiuni &#9662;
                       </button>
-
-                      {openDropdown === oferta.id && dropdownPos && createPortal(
-                        <div style={{
-                          position: 'fixed',
-                          left: `${dropdownPos.left}px`,
-                          top: `${dropdownPos.top}px`,
-                          background: 'white',
-                          borderRadius: '12px',
-                          boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
-                          border: '1px solid #eee',
-                          zIndex: 40000,
-                          minWidth: '200px',
-                          overflow: 'hidden'
-                        }}>
-                          {[
-                            { label: 'Editeaza', icon: '&#9998;', action: () => setEditingOferta(oferta) },
-                            { label: 'Schimba Status', icon: '&#128260;', action: () => setStatusOferta(oferta) },
-                            { label: 'Genereaza DOCX', icon: '&#128196;', action: () => handleGenerateDocx(oferta), disabled: generatingId === oferta.id },
-                            { label: 'Trimite Email', icon: '&#9993;', action: () => setEmailOferta(oferta) },
-                            { label: 'Istoric Status', icon: '&#128337;', action: () => setIstoricOferta(oferta) },
-                            { label: oferta.proiect_id_legat ? 'Schimba Proiect' : 'Leaga de Proiect', icon: '&#128279;', action: () => handleLinkProject(oferta) },
-                            { label: 'Sterge', icon: '&#128465;', action: () => handleDelete(oferta), danger: true },
-                          ].map((item, i) => (
-                            <button
-                              key={i}
-                              onClick={(e) => { e.stopPropagation(); setOpenDropdown(null); setDropdownPos(null); item.action(); }}
-                              disabled={(item as any).disabled}
-                              style={{
-                                display: 'block',
-                                width: '100%',
-                                padding: '10px 16px',
-                                background: 'none',
-                                border: 'none',
-                                textAlign: 'left' as const,
-                                cursor: (item as any).disabled ? 'not-allowed' : 'pointer',
-                                fontSize: '13px',
-                                fontWeight: '500',
-                                color: (item as any).danger ? '#e74c3c' : '#2c3e50',
-                                opacity: (item as any).disabled ? 0.5 : 1,
-                                borderBottom: i < 6 ? '1px solid #f0f0f0' : 'none',
-                                transition: 'background 0.15s'
-                              }}
-                              onMouseEnter={e => (e.currentTarget.style.background = '#f8f9fa')}
-                              onMouseLeave={e => (e.currentTarget.style.background = 'none')}
-                            >
-                              <span dangerouslySetInnerHTML={{ __html: item.icon }} /> {item.label}
-                              {(item as any).disabled && ' (se genereaza...)'}
-                            </button>
-                          ))}
-                        </div>,
-                        document.body
-                      )}
                     </td>
                   </tr>
                 );
@@ -443,6 +392,85 @@ export default function OferteTable({ searchParams, onKpiLoaded, refreshKey, onR
       )}
 
       {/* Modale */}
+      {/* Dropdown Actiuni - backdrop + portal (pattern ProiectActions) */}
+      {openDropdown && (() => {
+        const oferta = oferte.find(o => o.id === openDropdown);
+        if (!oferta) return null;
+        return (
+          <>
+            {/* Backdrop - click outside to close */}
+            <div
+              data-background="true"
+              style={{
+                position: 'fixed' as const,
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: 'rgba(0, 0, 0, 0.15)',
+                zIndex: 40000
+              }}
+              onClick={() => setOpenDropdown(null)}
+            />
+            {/* Dropdown menu via portal */}
+            {typeof window !== 'undefined' && createPortal(
+              <div
+                data-background="true"
+                style={{
+                  position: 'fixed' as const,
+                  top: dropdownCoords.top,
+                  left: dropdownCoords.left,
+                  width: 220,
+                  background: '#ffffff',
+                  borderRadius: '12px',
+                  boxShadow: '0 20px 40px rgba(0, 0, 0, 0.25)',
+                  border: '1px solid #e0e0e0',
+                  zIndex: 45000,
+                  overflow: 'hidden' as const
+                }}
+              >
+                {[
+                  { label: 'Editeaza', icon: '\u270E', action: () => setEditingOferta(oferta) },
+                  { label: 'Schimba Status', icon: '\uD83D\uDD04', action: () => setStatusOferta(oferta) },
+                  { label: 'Genereaza DOCX', icon: '\uD83D\uDCC4', action: () => handleGenerateDocx(oferta), disabled: generatingId === oferta.id },
+                  { label: 'Trimite Email', icon: '\u2709', action: () => setEmailOferta(oferta) },
+                  { label: 'Istoric Status', icon: '\uD83D\uDD59', action: () => setIstoricOferta(oferta) },
+                  { label: oferta.proiect_id_legat ? 'Schimba Proiect' : 'Leaga de Proiect', icon: '\uD83D\uDD17', action: () => handleLinkProject(oferta) },
+                  { label: 'Sterge', icon: '\uD83D\uDDD1', action: () => handleDelete(oferta), danger: true },
+                ].map((item, i) => (
+                  <button
+                    key={i}
+                    onClick={() => { setOpenDropdown(null); item.action(); }}
+                    disabled={(item as any).disabled}
+                    style={{
+                      display: 'block',
+                      width: '100%',
+                      padding: '10px 16px',
+                      background: 'none',
+                      border: 'none',
+                      textAlign: 'left' as const,
+                      cursor: (item as any).disabled ? 'not-allowed' : 'pointer',
+                      fontSize: '13px',
+                      fontWeight: '500',
+                      color: (item as any).danger ? '#e74c3c' : '#2c3e50',
+                      opacity: (item as any).disabled ? 0.5 : 1,
+                      borderBottom: i < 6 ? '1px solid #f0f0f0' : 'none',
+                      transition: 'background 0.15s'
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.background = '#f8f9fa')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                  >
+                    {item.icon} {item.label}
+                    {(item as any).disabled && ' (se genereaza...)'}
+                  </button>
+                ))}
+              </div>,
+              document.body
+            )}
+          </>
+        );
+      })()}
+
       {(showCreateModal || editingOferta) && createPortal(
         <OfertaModal
           isOpen={true}
