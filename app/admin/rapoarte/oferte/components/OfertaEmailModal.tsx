@@ -72,6 +72,7 @@ export default function OfertaEmailModal({ isOpen, onClose, onSuccess, oferta, u
   const [continut, setContinut] = useState('');
   const [destinatari, setDestinatari] = useState(oferta.client_email || '');
   const [attachDocx, setAttachDocx] = useState(true);
+  const [fromAddress, setFromAddress] = useState('');
   const [sending, setSending] = useState(false);
 
   useEffect(() => {
@@ -81,6 +82,7 @@ export default function OfertaEmailModal({ isOpen, onClose, onSuccess, oferta, u
   }, [tipEmail]);
 
   const handleSend = async () => {
+    if (!fromAddress) { showToast('Selecteaza adresa expeditor', 'error'); return; }
     const emailList = destinatari.split(/[,;\s]+/).filter(e => e.includes('@'));
     if (emailList.length === 0) { showToast('Adauga cel putin un email valid', 'error'); return; }
     if (!subiect.trim()) { showToast('Subiectul este obligatoriu', 'error'); return; }
@@ -99,7 +101,8 @@ export default function OfertaEmailModal({ isOpen, onClose, onSuccess, oferta, u
           destinatari: emailList,
           attach_docx: attachDocx && tipEmail === 'oferta',
           trimis_de: userId,
-          trimis_de_nume: userName
+          trimis_de_nume: userName,
+          from_address: fromAddress
         })
       });
       const data = await res.json();
@@ -149,6 +152,38 @@ export default function OfertaEmailModal({ isOpen, onClose, onSuccess, oferta, u
                 <span dangerouslySetInnerHTML={{ __html: type.icon }} /> {type.label}
               </button>
             ))}
+          </div>
+
+          {/* Expeditor */}
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{ fontSize: '12px', fontWeight: '600', color: '#7f8c8d', marginBottom: '6px', display: 'block' }}>Trimite de pe adresa *</label>
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              {[
+                { value: 'office@unitarproiect.eu', label: 'office@unitarproiect.eu' },
+                { value: 'contact@unitarproiect.eu', label: 'contact@unitarproiect.eu' }
+              ].map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setFromAddress(opt.value)}
+                  style={{
+                    flex: 1,
+                    padding: '0.6rem 1rem',
+                    borderRadius: '10px',
+                    border: fromAddress === opt.value ? '2px solid #3498db' : '1px solid #dee2e6',
+                    background: fromAddress === opt.value ? '#e3f2fd' : 'white',
+                    color: fromAddress === opt.value ? '#1565c0' : '#495057',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            {!fromAddress && <span style={{ fontSize: '11px', color: '#e74c3c', marginTop: '4px', display: 'block' }}>Selecteaza adresa expeditor</span>}
           </div>
 
           {/* Destinatari */}

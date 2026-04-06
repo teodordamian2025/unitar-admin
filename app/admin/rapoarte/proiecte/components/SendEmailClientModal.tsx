@@ -164,6 +164,7 @@ export default function SendEmailClientModal({
   const [contacte, setContacte] = useState<Contact[]>([]);
   const [selectedContacte, setSelectedContacte] = useState<string[]>([]);
   const [emailuriManuale, setEmailuriManuale] = useState('');
+  const [fromAddress, setFromAddress] = useState('');
   const [templateSelectat, setTemplateSelectat] = useState('stadiu_proiect');
   const [subiect, setSubiect] = useState('');
   const [continut, setContinut] = useState('');
@@ -464,6 +465,11 @@ export default function SendEmailClientModal({
       }
     }
 
+    if (!fromAddress) {
+      toast.error('Selectează adresa expeditor');
+      return;
+    }
+
     if (allEmails.length === 0) {
       toast.error('Selectează cel puțin un destinatar');
       return;
@@ -531,7 +537,8 @@ export default function SendEmailClientModal({
           template_folosit: templateSelectat,
           trimis_de: currentUser?.uid,
           trimis_de_nume: currentUser?.displayName || currentUser?.email,
-          attachments: allAttachments.length > 0 ? allAttachments : undefined
+          attachments: allAttachments.length > 0 ? allAttachments : undefined,
+          from_address: fromAddress
         })
       });
 
@@ -834,6 +841,40 @@ export default function SendEmailClientModal({
                     fontSize: '0.875rem'
                   }}
                 />
+              </div>
+
+              {/* Selectare adresa expeditor */}
+              <div>
+                <label style={{ display: 'block', fontWeight: '600', color: '#374151', marginBottom: '0.5rem' }}>
+                  Trimite de pe adresa *
+                </label>
+                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                  {[
+                    { value: 'office@unitarproiect.eu', label: 'office@unitarproiect.eu' },
+                    { value: 'contact@unitarproiect.eu', label: 'contact@unitarproiect.eu' }
+                  ].map(opt => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setFromAddress(opt.value)}
+                      style={{
+                        flex: 1,
+                        padding: '0.65rem 1rem',
+                        borderRadius: '10px',
+                        border: fromAddress === opt.value ? '2px solid #3b82f6' : '1px solid #d1d5db',
+                        background: fromAddress === opt.value ? '#dbeafe' : 'white',
+                        color: fromAddress === opt.value ? '#1d4ed8' : '#374151',
+                        fontSize: '0.875rem',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+                {!fromAddress && <span style={{ fontSize: '0.75rem', color: '#dc2626', marginTop: '0.25rem', display: 'block' }}>Selecteaza adresa expeditor</span>}
               </div>
 
               {/* Selectare template */}

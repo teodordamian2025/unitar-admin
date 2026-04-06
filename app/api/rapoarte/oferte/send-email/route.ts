@@ -45,7 +45,8 @@ export async function POST(request: NextRequest) {
       destinatari,
       attach_docx,
       trimis_de,
-      trimis_de_nume
+      trimis_de_nume,
+      from_address
     } = body;
 
     if (!oferta_id) {
@@ -60,6 +61,16 @@ export async function POST(request: NextRequest) {
     if (!destinatari || !Array.isArray(destinatari) || destinatari.length === 0) {
       return NextResponse.json({ error: 'Cel putin un destinatar este obligatoriu' }, { status: 400 });
     }
+
+    // Validare from_address
+    const ALLOWED_FROM: Record<string, string> = {
+      'office@unitarproiect.eu': 'UNITAR PROIECT <office@unitarproiect.eu>',
+      'contact@unitarproiect.eu': 'UNITAR PROIECT <contact@unitarproiect.eu>',
+    };
+    if (!from_address || !ALLOWED_FROM[from_address]) {
+      return NextResponse.json({ error: 'Selecteaza adresa expeditor (office@ sau contact@)' }, { status: 400 });
+    }
+    const fromFormatted = ALLOWED_FROM[from_address];
 
     // Valideaza email-uri
     const validEmails = destinatari.filter((e: string) => isValidEmail(e));
@@ -108,6 +119,7 @@ export async function POST(request: NextRequest) {
     // Trimite email
     const emailResult = await sendEmail({
       to: validEmails,
+      from: fromFormatted,
       subject: subiect.trim(),
       text: continut.trim(),
       html: htmlContent,

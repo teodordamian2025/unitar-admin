@@ -35,7 +35,8 @@ export async function POST(request: NextRequest) {
       template_folosit,
       trimis_de,
       trimis_de_nume,
-      attachments
+      attachments,
+      from_address
     } = body;
 
     // Validări
@@ -54,6 +55,16 @@ export async function POST(request: NextRequest) {
     if (!destinatari || !Array.isArray(destinatari) || destinatari.length === 0) {
       return NextResponse.json({ error: 'Cel puțin un destinatar este obligatoriu' }, { status: 400 });
     }
+
+    // Validare from_address
+    const ALLOWED_FROM: Record<string, string> = {
+      'office@unitarproiect.eu': 'UNITAR PROIECT <office@unitarproiect.eu>',
+      'contact@unitarproiect.eu': 'UNITAR PROIECT <contact@unitarproiect.eu>',
+    };
+    if (!from_address || !ALLOWED_FROM[from_address]) {
+      return NextResponse.json({ error: 'Selectează adresa expeditor (office@ sau contact@)' }, { status: 400 });
+    }
+    const fromFormatted = ALLOWED_FROM[from_address];
 
     // Validare email-uri destinatari
     const validEmails: string[] = [];
@@ -93,6 +104,7 @@ export async function POST(request: NextRequest) {
     // Trimite email
     const emailResult = await sendEmail({
       to: validEmails,
+      from: fromFormatted,
       subject: subiect.trim(),
       text: continut.trim(),
       html: htmlContent,

@@ -336,6 +336,7 @@ export interface EmailPayload {
   to: string | string[];
   cc?: string[];
   bcc?: string[];
+  from?: string;
   subject: string;
   text: string;
   html: string;

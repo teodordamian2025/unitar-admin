@@ -82,7 +82,7 @@ export async function sendEmail(payload: EmailPayload): Promise<EmailSendResult>
     const transport = getEmailTransporter();
 
     const mailOptions = {
-      from: process.env.SMTP_FROM || 'UNITAR PROIECT TDA <office@unitarproiect.eu>',
+      from: payload.from || process.env.SMTP_FROM || 'UNITAR PROIECT TDA <office@unitarproiect.eu>',
       to: Array.isArray(payload.to) ? payload.to.join(', ') : payload.to,
       cc: payload.cc?.join(', '),
       bcc: payload.bcc?.join(', '),
