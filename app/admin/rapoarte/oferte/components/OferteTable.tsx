@@ -210,6 +210,32 @@ export default function OferteTable({ searchParams, onKpiLoaded, refreshKey, onR
     setGeneratingId(null);
   };
 
+  const handleGeneratePdf = async (oferta: Oferta) => {
+    setGeneratingId(oferta.id);
+    try {
+      const response = await fetch('/api/actions/oferte/generate-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ oferta_id: oferta.id })
+      });
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${oferta.numar_oferta || 'oferta'}.pdf`;
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast('Document PDF generat cu succes', 'success');
+      } else {
+        const data = await response.json();
+        showToast(data.error || 'Eroare la generare PDF', 'error');
+      }
+    } catch { showToast('Eroare de retea', 'error'); }
+    setGeneratingId(null);
+  };
+
   const handleLinkProject = async (oferta: Oferta) => {
     const proiectId = prompt('Introduceti ID-ul proiectului de legat (sau lasati gol pentru a sterge legatura):');
     if (proiectId === null) return;
@@ -433,6 +459,7 @@ export default function OferteTable({ searchParams, onKpiLoaded, refreshKey, onR
                   { label: 'Editeaza', icon: '\u270E', action: () => setEditingOferta(oferta) },
                   { label: 'Schimba Status', icon: '\uD83D\uDD04', action: () => setStatusOferta(oferta) },
                   { label: 'Genereaza DOCX', icon: '\uD83D\uDCC4', action: () => handleGenerateDocx(oferta), disabled: generatingId === oferta.id },
+                  { label: 'Genereaza PDF', icon: '\uD83D\uDCCB', action: () => handleGeneratePdf(oferta), disabled: generatingId === oferta.id },
                   { label: 'Trimite Email', icon: '\u2709', action: () => setEmailOferta(oferta) },
                   { label: 'Istoric Status', icon: '\uD83D\uDD59', action: () => setIstoricOferta(oferta) },
                   { label: oferta.proiect_id_legat ? 'Schimba Proiect' : 'Leaga de Proiect', icon: '\uD83D\uDD17', action: () => handleLinkProject(oferta) },
@@ -454,7 +481,7 @@ export default function OferteTable({ searchParams, onKpiLoaded, refreshKey, onR
                       fontWeight: '500',
                       color: (item as any).danger ? '#e74c3c' : '#2c3e50',
                       opacity: (item as any).disabled ? 0.5 : 1,
-                      borderBottom: i < 6 ? '1px solid #f0f0f0' : 'none',
+                      borderBottom: i < 7 ? '1px solid #f0f0f0' : 'none',
                       transition: 'background 0.15s'
                     }}
                     onMouseEnter={e => (e.currentTarget.style.background = '#f8f9fa')}

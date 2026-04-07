@@ -1,12 +1,20 @@
 // ==================================================================
 // CALEA: app/admin/rapoarte/oferte/components/OfertaEmailModal.tsx
-// DATA: 04.04.2026
+// DATA: 08.04.2026
 // DESCRIERE: Modal trimitere email oferta
+// ACTUALIZAT: Adaugat atasare PDF, upload fisiere din calculator, fix DOCX
 // ==================================================================
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+
+interface ManualAttachment {
+  name: string;
+  size: number;
+  type: string;
+  content: string; // base64
+}
 
 interface OfertaEmailModalProps {
   isOpen: boolean;
@@ -66,20 +74,91 @@ function getDefaultContent(tipEmail: string, oferta: OfertaEmailModalProps['ofer
   }
 }
 
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export default function OfertaEmailModal({ isOpen, onClose, onSuccess, oferta, userId, userName }: OfertaEmailModalProps) {
   const [tipEmail, setTipEmail] = useState('oferta');
   const [subiect, setSubiect] = useState('');
   const [continut, setContinut] = useState('');
   const [destinatari, setDestinatari] = useState(oferta.client_email || '');
-  const [attachDocx, setAttachDocx] = useState(true);
+  const [attachDocx, setAttachDocx] = useState(false);
+  const [attachPdf, setAttachPdf] = useState(true);
   const [fromAddress, setFromAddress] = useState('');
   const [sending, setSending] = useState(false);
+  const [manualAttachments, setManualAttachments] = useState<ManualAttachment[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB per file
+  const MAX_TOTAL_SIZE = 25 * 1024 * 1024; // 25MB total
 
   useEffect(() => {
     const defaults = getDefaultContent(tipEmail, oferta);
     setSubiect(defaults.subiect);
     setContinut(defaults.continut);
   }, [tipEmail]);
+
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => {
+        const result = reader.result as string;
+        const base64 = result.split(',')[1];
+        resolve(base64);
+      };
+      reader.onerror = error => reject(error);
+    });
+  };
+
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    const currentTotalSize = manualAttachments.reduce((sum, att) => sum + att.size, 0);
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+
+      if (file.size > MAX_FILE_SIZE) {
+        showToast(`Fisierul "${file.name}" depaseste limita de 10MB`, 'error');
+        continue;
+      }
+
+      if (currentTotalSize + file.size > MAX_TOTAL_SIZE) {
+        showToast('Dimensiunea totala a atasamentelor depaseste 25MB', 'error');
+        break;
+      }
+
+      if (manualAttachments.some(att => att.name === file.name)) {
+        showToast(`Fisierul "${file.name}" exista deja`, 'error');
+        continue;
+      }
+
+      try {
+        const base64 = await fileToBase64(file);
+        setManualAttachments(prev => [...prev, {
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          content: base64
+        }]);
+      } catch {
+        showToast(`Eroare la incarcarea fisierului "${file.name}"`, 'error');
+      }
+    }
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const removeAttachment = (index: number) => {
+    setManualAttachments(prev => prev.filter((_, i) => i !== index));
+  };
 
   const handleSend = async () => {
     if (!fromAddress) { showToast('Selecteaza adresa expeditor', 'error'); return; }
@@ -100,6 +179,8 @@ export default function OfertaEmailModal({ isOpen, onClose, onSuccess, oferta, u
           continut: continut.trim(),
           destinatari: emailList,
           attach_docx: attachDocx && tipEmail === 'oferta',
+          attach_pdf: attachPdf && tipEmail === 'oferta',
+          manual_attachments: manualAttachments.length > 0 ? manualAttachments : undefined,
           trimis_de: userId,
           trimis_de_nume: userName,
           from_address: fromAddress
@@ -204,15 +285,85 @@ export default function OfertaEmailModal({ isOpen, onClose, onSuccess, oferta, u
             <textarea value={continut} onChange={e => setContinut(e.target.value)} style={{ ...inputStyle, minHeight: '200px', resize: 'vertical' as const, fontFamily: 'inherit', lineHeight: '1.6' }} />
           </div>
 
-          {/* Atasament */}
+          {/* Atasamente documente oferta */}
           {tipEmail === 'oferta' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1rem', background: '#f8f9fa', borderRadius: '8px' }}>
-              <input type="checkbox" checked={attachDocx} onChange={e => setAttachDocx(e.target.checked)} id="attach-docx" />
-              <label htmlFor="attach-docx" style={{ fontSize: '13px', color: '#495057', cursor: 'pointer' }}>
-                Ataseaza documentul DOCX {oferta.path_fisier ? '(generat)' : '(nu exista inca - genereaza mai intai)'}
-              </label>
+            <div style={{ padding: '0.75rem 1rem', background: '#f8f9fa', borderRadius: '8px', marginBottom: '0.75rem' }}>
+              <label style={{ fontSize: '12px', fontWeight: '600', color: '#7f8c8d', marginBottom: '8px', display: 'block' }}>Atasamente document oferta</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <input type="checkbox" checked={attachPdf} onChange={e => setAttachPdf(e.target.checked)} id="attach-pdf" />
+                  <label htmlFor="attach-pdf" style={{ fontSize: '13px', color: '#495057', cursor: 'pointer' }}>
+                    Ataseaza oferta PDF (se genereaza automat)
+                  </label>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <input type="checkbox" checked={attachDocx} onChange={e => setAttachDocx(e.target.checked)} id="attach-docx" />
+                  <label htmlFor="attach-docx" style={{ fontSize: '13px', color: '#495057', cursor: 'pointer' }}>
+                    Ataseaza oferta DOCX (se genereaza automat)
+                  </label>
+                </div>
+              </div>
             </div>
           )}
+
+          {/* Upload fisiere din calculator */}
+          <div style={{ padding: '0.75rem 1rem', background: '#f8f9fa', borderRadius: '8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <label style={{ fontSize: '12px', fontWeight: '600', color: '#7f8c8d' }}>Alte atasamente</label>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                style={{
+                  padding: '4px 12px', borderRadius: '6px', border: '1px solid #3498db',
+                  background: '#e3f2fd', color: '#1565c0', fontSize: '12px', fontWeight: '600',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px'
+                }}
+              >
+                + Adauga fisier
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.txt,.csv,.zip"
+                onChange={handleFileSelect}
+                style={{ display: 'none' }}
+              />
+            </div>
+            {manualAttachments.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                {manualAttachments.map((att, idx) => (
+                  <div key={idx} style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '6px 10px', background: 'white', borderRadius: '6px', border: '1px solid #e0e0e0'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontSize: '14px' }}>
+                        {att.type.includes('pdf') ? '\uD83D\uDCC4' : att.type.includes('image') ? '\uD83D\uDDBC' : '\uD83D\uDCC1'}
+                      </span>
+                      <span style={{ fontSize: '12px', color: '#2c3e50' }}>{att.name}</span>
+                      <span style={{ fontSize: '11px', color: '#95a5a6' }}>({formatFileSize(att.size)})</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeAttachment(idx)}
+                      style={{
+                        padding: '2px 6px', background: 'none', border: 'none',
+                        color: '#e74c3c', fontSize: '14px', cursor: 'pointer'
+                      }}
+                    >
+                      &times;
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {manualAttachments.length === 0 && (
+              <div style={{ fontSize: '12px', color: '#95a5a6', fontStyle: 'italic' }}>
+                Niciun fisier atasat manual. Accepta: PDF, DOC, DOCX, XLS, XLSX, imagini, TXT, CSV, ZIP (max 10MB/fisier)
+              </div>
+            )}
+          </div>
         </div>
 
         <div style={{ padding: '1.5rem 2rem', borderTop: '1px solid #eee', display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>

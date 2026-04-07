@@ -8,6 +8,11 @@
 
 import { useState, useEffect } from 'react';
 
+interface Serviciu {
+  denumire: string;
+  pret: number;
+}
+
 interface DetaliiTehnice {
   faza_proiectare?: string;
   tip_cladire?: string;
@@ -22,6 +27,7 @@ interface DetaliiTehnice {
   grafic_plata_t1?: number;
   grafic_plata_t2?: number;
   grafic_plata_t3?: number;
+  servicii?: Serviciu[];
 }
 
 interface Oferta {
@@ -118,6 +124,12 @@ export default function OfertaModal({ isOpen, onClose, onSuccess, oferta, userId
 
   const existingDetalii = parseDetaliiTehnice(oferta?.detalii_tehnice);
 
+  const [servicii, setServicii] = useState<Serviciu[]>(
+    existingDetalii.servicii && existingDetalii.servicii.length > 0
+      ? existingDetalii.servicii
+      : [{ denumire: '', pret: 0 }]
+  );
+
   const [form, setForm] = useState({
     tip_oferta: oferta?.tip_oferta || '',
     client_id: oferta?.client_id || '',
@@ -152,6 +164,17 @@ export default function OfertaModal({ isOpen, onClose, onSuccess, oferta, userId
     grafic_plata_t2: existingDetalii.grafic_plata_t2 ?? 40,
     grafic_plata_t3: existingDetalii.grafic_plata_t3 ?? 20,
   });
+
+  // Recalculeaza valoare totala cand se schimba serviciile
+  useEffect(() => {
+    const filledServicii = servicii.filter(s => s.denumire.trim() || s.pret > 0);
+    if (filledServicii.length > 0) {
+      const total = filledServicii.reduce((sum, s) => sum + (s.pret || 0), 0);
+      if (total > 0) {
+        setForm(prev => ({ ...prev, valoare: total }));
+      }
+    }
+  }, [servicii]);
 
   const [saving, setSaving] = useState(false);
   const [clientSearch, setClientSearch] = useState('');
@@ -198,6 +221,7 @@ export default function OfertaModal({ isOpen, onClose, onSuccess, oferta, userId
     setSaving(true);
     try {
       // Pack detalii_tehnice fields into JSON
+      const filledServicii = servicii.filter(s => s.denumire.trim() && s.pret > 0);
       const detalii_tehnice = JSON.stringify({
         faza_proiectare: form.faza_proiectare,
         tip_cladire: form.tip_cladire,
@@ -212,6 +236,7 @@ export default function OfertaModal({ isOpen, onClose, onSuccess, oferta, userId
         grafic_plata_t1: form.grafic_plata_t1,
         grafic_plata_t2: form.grafic_plata_t2,
         grafic_plata_t3: form.grafic_plata_t3,
+        servicii: filledServicii.length > 0 ? filledServicii : undefined,
       });
 
       // Exclude individual detalii fields from API payload
@@ -479,9 +504,83 @@ export default function OfertaModal({ isOpen, onClose, onSuccess, oferta, userId
           <div style={{ marginBottom: '1.5rem', padding: '1.5rem', background: '#f8f9fa', borderRadius: '12px' }}>
             <h3 style={{ margin: '0 0 1rem', fontSize: '16px', fontWeight: '600', color: '#2c3e50' }}>Date Financiare</h3>
 
+            {/* Servicii multiple */}
+            <div style={{ marginBottom: '1rem', padding: '1rem', background: 'white', borderRadius: '8px', border: '1px solid #e0e0e0' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <label style={{ ...labelStyle, marginBottom: 0 }}>Servicii oferite</label>
+                <button
+                  type="button"
+                  onClick={() => setServicii(prev => [...prev, { denumire: '', pret: 0 }])}
+                  style={{
+                    padding: '4px 12px', borderRadius: '6px', border: '1px solid #27ae60',
+                    background: '#e8f8f0', color: '#27ae60', fontSize: '13px', fontWeight: '600',
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px'
+                  }}
+                >
+                  + Adauga serviciu
+                </button>
+              </div>
+              {servicii.map((serviciu, idx) => (
+                <div key={idx} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
+                  <span style={{ fontSize: '13px', color: '#7f8c8d', minWidth: '24px', fontWeight: '600' }}>{idx + 1}.</span>
+                  <div style={{ flex: 2 }}>
+                    {idx === 0 && <label style={{ ...labelStyle, fontSize: '11px' }}>Denumire serviciu</label>}
+                    <input
+                      type="text"
+                      value={serviciu.denumire}
+                      onChange={e => {
+                        const updated = [...servicii];
+                        updated[idx] = { ...updated[idx], denumire: e.target.value };
+                        setServicii(updated);
+                      }}
+                      style={inputStyle}
+                      placeholder={`Ex: Proiect consolidare, Expertiza tehnica...`}
+                    />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    {idx === 0 && <label style={{ ...labelStyle, fontSize: '11px' }}>Pret ({form.moneda})</label>}
+                    <input
+                      type="number"
+                      value={serviciu.pret || ''}
+                      onChange={e => {
+                        const updated = [...servicii];
+                        updated[idx] = { ...updated[idx], pret: parseFloat(e.target.value) || 0 };
+                        setServicii(updated);
+                      }}
+                      style={inputStyle}
+                      placeholder="0.00"
+                      min="0"
+                      step="0.01"
+                    />
+                  </div>
+                  {servicii.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => setServicii(prev => prev.filter((_, i) => i !== idx))}
+                      style={{
+                        padding: '6px 10px', borderRadius: '6px', border: '1px solid #e74c3c',
+                        background: '#fef2f2', color: '#e74c3c', fontSize: '14px',
+                        cursor: 'pointer', marginTop: idx === 0 ? '18px' : 0
+                      }}
+                    >
+                      -
+                    </button>
+                  )}
+                </div>
+              ))}
+              {servicii.filter(s => s.pret > 0).length > 1 && (
+                <div style={{ marginTop: '8px', padding: '8px 12px', background: '#f0fdf4', borderRadius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '13px', fontWeight: '600', color: '#16a34a' }}>Total servicii:</span>
+                  <span style={{ fontSize: '15px', fontWeight: '700', color: '#16a34a' }}>
+                    {servicii.reduce((sum, s) => sum + (s.pret || 0), 0).toLocaleString('ro-RO')} {form.moneda} + TVA
+                  </span>
+                </div>
+              )}
+            </div>
+
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
               <div>
-                <label style={labelStyle}>Valoare *</label>
+                <label style={labelStyle}>Valoare totala * {servicii.filter(s => s.pret > 0).length > 1 ? '(calculata din servicii)' : ''}</label>
                 <input type="number" value={form.valoare || ''} onChange={e => handleChange('valoare', parseFloat(e.target.value) || 0)} style={inputStyle} placeholder="0.00" min="0" step="0.01" />
               </div>
               <div>

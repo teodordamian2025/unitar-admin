@@ -132,8 +132,28 @@ function processOfertaPlaceholders(xml: string, data: any): string {
   // 2. Pret: ___________ EUR + TVA si variante
   const valoareStr = data.valoare ? data.valoare.toLocaleString('ro-RO', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) : '____';
   const monedaStr = data.moneda || 'EUR';
-  processed = processed.replace(/[_.]{3,}\]?\s*(EUR|RON|USD)\s*\+\s*TVA/gi, `${valoareStr} ${monedaStr} + TVA`);
-  processed = processed.replace(/[_.]{3,}\s*(EUR|RON|USD)/gi, `${valoareStr} ${monedaStr}`);
+
+  // Daca avem servicii multiple, construim lista servicii + total
+  const servicii: Array<{denumire: string; pret: number}> = detalii.servicii || [];
+  if (servicii.length > 1) {
+    // Construim text cu servicii individuale si total
+    const serviciiLines = servicii.map((s: any, i: number) =>
+      `${i + 1}. ${escapeXml(s.denumire)} \u2013 ${s.pret.toLocaleString('ro-RO')} ${monedaStr} + TVA`
+    ).join('</w:t></w:r></w:p><w:p><w:r><w:t xml:space="preserve">');
+    const totalStr = `TOTAL: ${valoareStr} ${monedaStr} + TVA`;
+    const serviciiBlock = serviciiLines + '</w:t></w:r></w:p><w:p><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">' + totalStr;
+
+    // Replace pretul principal cu lista servicii
+    processed = processed.replace(
+      /[_.]{3,}\]?\s*(EUR|RON|USD)\s*\+\s*TVA/i,
+      serviciiBlock
+    );
+    // Inlocuim si al doilea pattern daca exista
+    processed = processed.replace(/[_.]{3,}\s*(EUR|RON|USD)/gi, `${valoareStr} ${monedaStr}`);
+  } else {
+    processed = processed.replace(/[_.]{3,}\]?\s*(EUR|RON|USD)\s*\+\s*TVA/gi, `${valoareStr} ${monedaStr} + TVA`);
+    processed = processed.replace(/[_.]{3,}\s*(EUR|RON|USD)/gi, `${valoareStr} ${monedaStr}`);
+  }
 
   // 3. Termen executie: ___ zile lucratoare
   const termenStr = data.termen_executie || '30';
