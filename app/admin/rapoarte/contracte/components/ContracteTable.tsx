@@ -8,7 +8,7 @@
 
 'use client';
 
-import { useState, useEffect, Fragment } from 'react';
+import { useState, useEffect, useRef, Fragment } from 'react';
 import ContractActions from './ContractActions';
 import ContractSignModal from './ContractSignModal';
 import AnexaSignModal from './AnexaSignModal';
@@ -284,6 +284,10 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
   
   const [cursuriLive, setCursuriLive] = useState<CursuriLive>({});
   const [loadingCursuri, setLoadingCursuri] = useState(false);
+  // FIX P2: Ref pentru a urmări monedele deja fetch-uite - evită refetch la fiecare data change
+  const cursuriFetchedRef = useRef<Set<string>>(new Set());
+  // FIX P1: Ref pentru AbortController - anulează request-urile stale
+  const abortControllerRef = useRef<AbortController | null>(null);
   
   const [showFacturaModal, setShowFacturaModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -311,9 +315,20 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
   }, [searchParamsString]);
 
   // UseEffect-uri pentru încărcarea datelor
-  // FIX: Folosim searchParamsString în loc de searchParams pentru a evita re-fetch-uri multiple
+  // FIX P1: searchParamsString + debounce 300ms + AbortController pentru race condition
   useEffect(() => {
-    loadData();
+    const timer = setTimeout(() => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+      loadData(controller.signal);
+    }, 300);
+
+    return () => {
+      clearTimeout(timer);
+    };
   }, [searchParamsString, refreshTrigger, currentPage]);
 
   useEffect(() => {
@@ -332,17 +347,15 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
     }
   }, [contracte]);
 
-  // Funcție pentru identificare și preluare cursuri LIVE - ADAPTATĂ pentru contracte
+  // FIX P2: Funcție care preia DOAR monedele noi (nefetchuite încă)
+  // Elimină refetch-urile duplicate la fiecare schimbare de filtre/pagină
   const identificaSiPreiaCursuriLive = async () => {
     const valuteNecesare = new Set<string>();
-    
+
     contracte.forEach(c => {
-      // Valutele de la contract
       if (c.Moneda && c.Moneda !== 'RON') {
         valuteNecesare.add(c.Moneda);
       }
-      
-      // Valutele de la etape
       if (c.etape) {
         c.etape.forEach(e => {
           if (e.moneda && e.moneda !== 'RON') {
@@ -350,8 +363,6 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
           }
         });
       }
-      
-      // Valutele de la anexe
       if (c.anexe) {
         c.anexe.forEach(a => {
           if (a.moneda && a.moneda !== 'RON') {
@@ -360,19 +371,20 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
         });
       }
     });
-    
-    if (valuteNecesare.size === 0) {
+
+    // FIX P2: Filtrez doar monedele pe care NU le-am fetch-uit deja în sesiunea curentă
+    const monedeNoi = Array.from(valuteNecesare).filter(m => !cursuriFetchedRef.current.has(m));
+
+    if (monedeNoi.length === 0) {
       return;
     }
-    
-    const monede = Array.from(valuteNecesare);
+
     setLoadingCursuri(true);
-    
+
     try {
-      const promisesCursuri = monede.map(async (moneda) => {
+      const promisesCursuri = monedeNoi.map(async (moneda) => {
         try {
           const cursLive = await getCursBNRLive(moneda);
-          
           return {
             moneda,
             curs: cursLive,
@@ -388,34 +400,34 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
           };
         }
       });
-      
+
       const rezultateCursuri = await Promise.all(promisesCursuri);
-      
-      const cursuriNoi: CursuriLive = {};
-      let cursuriObtinute = 0;
-      
-      rezultateCursuri.forEach((rezultat) => {
-        if (rezultat) {
-          cursuriNoi[rezultat.moneda] = {
-            curs: rezultat.curs || 1,
-            data: rezultat.data || new Date().toISOString().split('T')[0],
-            precizie_originala: rezultat.precizie_originala,
-            loading: false,
-            error: rezultat.error
-          };
-          
-          if (!rezultat.error) {
-            cursuriObtinute++;
+
+      setCursuriLive(prev => {
+        const cursuriNoi: CursuriLive = { ...prev };
+        rezultateCursuri.forEach((rezultat) => {
+          if (rezultat) {
+            cursuriNoi[rezultat.moneda] = {
+              curs: rezultat.curs || 1,
+              data: rezultat.data || new Date().toISOString().split('T')[0],
+              precizie_originala: rezultat.precizie_originala,
+              loading: false,
+              error: rezultat.error
+            };
+            if (!rezultat.error) {
+              cursuriFetchedRef.current.add(rezultat.moneda);
+            }
           }
-        }
+        });
+        return cursuriNoi;
       });
-      
-      setCursuriLive(cursuriNoi);
-      
+
+      // Nu mai afișăm toast la succes - prea zgomotos. Păstrăm doar în consolă.
+      const cursuriObtinute = rezultateCursuri.filter(r => r && !r.error).length;
       if (cursuriObtinute > 0) {
-        showToast(`Cursuri BNR live actualizate (${cursuriObtinute}/${monede.length})`, 'success');
+        console.log(`✅ Cursuri BNR actualizate: ${cursuriObtinute}/${monedeNoi.length} monede noi`);
       }
-      
+
     } catch (error) {
       console.error('Eroare generală la preluarea cursurilor live:', error);
     } finally {
@@ -423,19 +435,24 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
     }
   };
 
-  const loadData = async () => {
+  const loadData = async (signal?: AbortSignal) => {
     try {
       setLoading(true);
-      await loadContracte();
-    } catch (error) {
+      await loadContracte(signal);
+    } catch (error: any) {
+      if (error?.name === 'AbortError') {
+        return;
+      }
       console.error('Eroare la încărcarea datelor:', error);
       showToast('Eroare de conectare la baza de date', 'error');
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) {
+        setLoading(false);
+      }
     }
   };
 
-  const loadContracte = async () => {
+  const loadContracte = async (signal?: AbortSignal) => {
     try {
       const queryParams = new URLSearchParams();
       if (searchParams) {
@@ -450,13 +467,13 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
       queryParams.set('limit', itemsPerPage.toString());
       queryParams.set('offset', ((currentPage - 1) * itemsPerPage).toString());
 
-      const response = await fetch(`/api/rapoarte/contracte?${queryParams.toString()}`);
+      const response = await fetch(`/api/rapoarte/contracte?${queryParams.toString()}`, { signal });
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
-      
+
       const data = await response.json();
-      
+
       if (data.success) {
         // REPARAT: Procesează obiectele DATE de la BigQuery identic cu ProiecteTable
         const contracteFormatate = (data.data || []).map((c: any) => ({
@@ -471,7 +488,7 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
         setTotalItems(data.total || contracteFormatate.length);
 
         console.log(`Contracte încărcate: ${contracteFormatate.length} din ${data.total || contracteFormatate.length}`);
-        
+
         // NOU: Log statistici pentru etape și anexe
         if (data.stats) {
           console.log('Statistici contracte:', data.stats);
@@ -479,7 +496,10 @@ export default function ContracteTable({ searchParams }: ContracteTableProps) {
       } else {
         throw new Error(data.error || 'Eroare la încărcarea contractelor');
       }
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.name === 'AbortError') {
+        throw error;
+      }
       console.error('Eroare la încărcarea contractelor:', error);
       setContracte([]);
     }

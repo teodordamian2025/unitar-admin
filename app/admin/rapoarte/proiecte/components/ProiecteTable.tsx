@@ -7,7 +7,7 @@
 
 'use client';
 
-import { useState, useEffect, Fragment } from 'react';
+import { useState, useEffect, useRef, Fragment } from 'react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from '@/lib/firebaseConfig';
 import ProiectActions from './ProiectActions';
@@ -321,6 +321,8 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
 
   const [cursuriLive, setCursuriLive] = useState<CursuriLive>({});
   const [loadingCursuri, setLoadingCursuri] = useState(false);
+  // FIX P2: Ref pentru a urmări monedele deja fetch-uite - evită refetch la fiecare data change
+  const cursuriFetchedRef = useRef<Set<string>>(new Set());
 
   const [showProiectModal, setShowProiectModal] = useState(false);
   const [showFacturaModal, setShowFacturaModal] = useState(false);
@@ -337,12 +339,32 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
 
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
 
-  // Toate useEffect-urile - PĂSTRATE identic + reset paginare la schimbarea filtrelor
+  // FIX: Serializare searchParams pentru comparare stabilă în useEffect (evită race condition)
+  const searchParamsString = JSON.stringify(searchParams || {});
+
+  // FIX: Ref pentru AbortController - anulează request-urile stale când filtrele se schimbă rapid
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Toate useEffect-urile - reset paginare la schimbarea filtrelor + debounce 300ms + abort stale requests
   useEffect(() => {
     // Reset la pagina 1 când se schimbă filtrele
     setPagination(prev => ({ ...prev, page: 1 }));
-    loadData();
-  }, [searchParams, refreshTrigger]);
+
+    // Debounce 300ms pentru a nu fetch la fiecare tastare
+    const timer = setTimeout(() => {
+      // Anulează request-ul anterior dacă mai există
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+      loadData(controller.signal);
+    }, 300);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [searchParamsString, refreshTrigger]);
 
   // ✅ NOU: Preluare comentarii necitite când se încarcă proiectele sau user-ul se schimbă
   useEffect(() => {
@@ -381,40 +403,42 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     }
   }, [proiecte, subproiecte]);
 
-  // FIX PRINCIPAL: Funcție pentru identificare și preluare cursuri ACTUALIZATĂ
+  // FIX P2: Funcție care preia DOAR monedele noi (nefetchuite încă)
+  // Elimină refetch-urile duplicate la fiecare schimbare de filtre/pagină
   const identificaSiPreiaCursuriLive = async () => {
     const valuteNecesare = new Set<string>();
-    
+
     proiecte.forEach(p => {
       if (p.moneda && p.moneda !== 'RON') {
         valuteNecesare.add(p.moneda);
       }
     });
-    
+
     subproiecte.forEach(s => {
       if (s.moneda && s.moneda !== 'RON') {
         valuteNecesare.add(s.moneda);
       }
     });
-    
-    if (valuteNecesare.size === 0) {
+
+    // FIX P2: Filtrez doar monedele pe care NU le-am fetch-uit deja în sesiunea curentă
+    const monedeNoi = Array.from(valuteNecesare).filter(m => !cursuriFetchedRef.current.has(m));
+
+    if (monedeNoi.length === 0) {
       return;
     }
-    
-    const monede = Array.from(valuteNecesare);
+
     setLoadingCursuri(true);
-    
+
     try {
-      const promisesCursuri = monede.map(async (moneda) => {
+      const promisesCursuri = monedeNoi.map(async (moneda) => {
         try {
           const cursLive = await getCursBNRLive(moneda);
-          
-          // FIX: Nu forțez 4 zecimale, păstrez precizia originală
+
           return {
             moneda,
             curs: cursLive,
             data: new Date().toISOString().split('T')[0],
-            precizie_originala: cursLive.toString(), // Păstrez precizia naturală
+            precizie_originala: cursLive.toString(),
             loading: false
           };
         } catch (error) {
@@ -425,34 +449,35 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
           };
         }
       });
-      
+
       const rezultateCursuri = await Promise.all(promisesCursuri);
-      
-      const cursuriNoi: CursuriLive = {};
-      let cursuriObtinute = 0;
-      
-      rezultateCursuri.forEach((rezultat) => {
-        if (rezultat) {
-          cursuriNoi[rezultat.moneda] = {
-            curs: rezultat.curs || 1,
-            data: rezultat.data || new Date().toISOString().split('T')[0],
-            precizie_originala: rezultat.precizie_originala,
-            loading: false,
-            error: rezultat.error
-          };
-          
-          if (!rezultat.error) {
-            cursuriObtinute++;
+
+      setCursuriLive(prev => {
+        const cursuriNoi: CursuriLive = { ...prev };
+        rezultateCursuri.forEach((rezultat) => {
+          if (rezultat) {
+            cursuriNoi[rezultat.moneda] = {
+              curs: rezultat.curs || 1,
+              data: rezultat.data || new Date().toISOString().split('T')[0],
+              precizie_originala: rezultat.precizie_originala,
+              loading: false,
+              error: rezultat.error
+            };
+            if (!rezultat.error) {
+              // Marchez moneda ca fetch-uită doar dacă nu a eșuat
+              cursuriFetchedRef.current.add(rezultat.moneda);
+            }
           }
-        }
+        });
+        return cursuriNoi;
       });
-      
-      setCursuriLive(cursuriNoi);
-      
+
+      // Nu mai afișăm toast la succes - prea zgomotos. Păstrăm doar în consolă.
+      const cursuriObtinute = rezultateCursuri.filter(r => r && !r.error).length;
       if (cursuriObtinute > 0) {
-        showToast(`Cursuri BNR live actualizate (${cursuriObtinute}/${monede.length})`, 'success');
+        console.log(`✅ Cursuri BNR actualizate: ${cursuriObtinute}/${monedeNoi.length} monede noi`);
       }
-      
+
     } catch (error) {
       console.error('Eroare generală la preluarea cursurilor live:', error);
     } finally {
@@ -478,20 +503,27 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
     }
   }, [searchParams]);
 
-  // Toate funcțiile de încărcare date - PĂSTRATE identic
-  const loadData = async () => {
+  // Toate funcțiile de încărcare date - PĂSTRATE identic + AbortController support
+  const loadData = async (signal?: AbortSignal) => {
     try {
       setLoading(true);
-      await Promise.all([loadProiecte(), loadSubproiecte()]);
-    } catch (error) {
+      await Promise.all([loadProiecte(pagination.page, signal), loadSubproiecte(signal)]);
+    } catch (error: any) {
+      if (error?.name === 'AbortError') {
+        // Request-ul a fost anulat intenționat, nu afișăm eroare
+        return;
+      }
       console.error('Eroare la încărcarea datelor:', error);
       showToast('Eroare de conectare la baza de date', 'error');
     } finally {
-      setLoading(false);
+      // Nu opri loading-ul dacă request-ul a fost anulat (un altul e în progres)
+      if (!signal?.aborted) {
+        setLoading(false);
+      }
     }
   };
 
-  const loadProiecte = async (page: number = pagination.page) => {
+  const loadProiecte = async (page: number = pagination.page, signal?: AbortSignal) => {
     try {
       const queryParams = new URLSearchParams();
       if (searchParams) {
@@ -506,11 +538,11 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
       queryParams.append('page', page.toString());
       queryParams.append('limit', pagination.limit.toString());
 
-      const response = await fetch(`/api/rapoarte/proiecte?${queryParams.toString()}`);
+      const response = await fetch(`/api/rapoarte/proiecte?${queryParams.toString()}`, { signal });
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
-      
+
       const data = await response.json();
       
       console.log('=== DEBUG: Date RAW din BigQuery ===');
@@ -542,13 +574,16 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
       } else {
         throw new Error(data.error || 'Eroare la încărcarea proiectelor');
       }
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.name === 'AbortError') {
+        throw error;
+      }
       console.error('Eroare la încărcarea proiectelor:', error);
       setProiecte([]);
     }
   };
 
-  const loadSubproiecte = async () => {
+  const loadSubproiecte = async (signal?: AbortSignal) => {
     try {
       const queryParams = new URLSearchParams();
       if (searchParams) {
@@ -559,11 +594,11 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
         });
       }
 
-      const response = await fetch(`/api/rapoarte/subproiecte?${queryParams.toString()}`);
+      const response = await fetch(`/api/rapoarte/subproiecte?${queryParams.toString()}`, { signal });
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
-      
+
       const data = await response.json();
       
       if (data.success) {
@@ -578,7 +613,10 @@ export default function ProiecteTable({ searchParams }: ProiecteTableProps) {
       } else {
         setSubproiecte([]);
       }
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.name === 'AbortError') {
+        throw error;
+      }
       console.error('Eroare la încărcarea subproiectelor:', error);
       setSubproiecte([]);
     }
