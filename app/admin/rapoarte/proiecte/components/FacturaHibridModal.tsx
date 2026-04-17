@@ -518,6 +518,76 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
         console.log(`📋 [CONTRACT] Contract salvat în state: ${contract.numar_contract} (${contract.ID_Contract})`);
       }
 
+      // ✅ NOU 17.04.2026: Auto-pre-completare articol factură cu etapa unică
+      // Dacă contractul are o singură etapă nefacturată (ex: etapa default "La predarea proiectului"),
+      // înlocuim linia generică "Servicii" cu etapa reală, astfel încât raportarea să lege factura direct de etapă.
+      if (!isEdit && !isStorno && toateEtapele.length === 1) {
+        const uniqueEtapa = toateEtapele[0];
+        const etapaId = uniqueEtapa.ID_Etapa || uniqueEtapa.ID_Anexa;
+
+        setLiniiFactura(prev => {
+          // Doar dacă liniile sunt încă în starea default (o singură linie fără etapa_id/anexa_id)
+          const isDefaultState = prev.length === 1
+            && !prev[0].etapa_id
+            && !prev[0].anexa_id;
+
+          if (!isDefaultState) {
+            console.log('⏭️ [AUTO-PRE-FILL] Utilizatorul a modificat deja liniile, skip auto-pre-completare');
+            return prev;
+          }
+
+          // Calcul valoare cu fallback pe cursul din BD (cursurile din state pot să nu fie încă încărcate)
+          const valoareEstimata = convertBigQueryNumeric(uniqueEtapa.valoare);
+          let valoareEtapa = valoareEstimata;
+          const monedaEtapa = uniqueEtapa.moneda || 'RON';
+          let cursEtapa = 1;
+
+          if (monedaEtapa !== 'RON') {
+            const cursState = cursuri[monedaEtapa];
+            if (cursState) {
+              cursEtapa = cursState.curs;
+              valoareEtapa = valoareEstimata * cursState.curs;
+            } else if (uniqueEtapa.curs_valutar && uniqueEtapa.curs_valutar > 0) {
+              // Fallback pe cursul din BD; useEffect-ul de recalculare cursuri va actualiza ulterior linia
+              cursEtapa = convertBigQueryNumeric(uniqueEtapa.curs_valutar);
+              if (uniqueEtapa.valoare_ron) {
+                valoareEtapa = convertBigQueryNumeric(uniqueEtapa.valoare_ron);
+              }
+            }
+          }
+
+          const { titlu, descriere } = genereazaArticolEtapa(uniqueEtapa);
+
+          console.log(`✅ [AUTO-PRE-FILL] Înlocuiesc linia default cu etapa unică: ${uniqueEtapa.denumire}`);
+
+          return [{
+            denumire: titlu,
+            descriere: descriere,
+            cantitate: 1,
+            pretUnitar: valoareEtapa,
+            cotaTva: 21,
+            tip: uniqueEtapa.tip === 'contract' ? 'etapa_contract' : 'etapa_anexa',
+            etapa_id: uniqueEtapa.ID_Etapa,
+            anexa_id: uniqueEtapa.ID_Anexa,
+            contract_id: uniqueEtapa.contract_id,
+            contract_numar: uniqueEtapa.contract_numar,
+            contract_data: uniqueEtapa.contract_data,
+            anexa_numar: uniqueEtapa.anexa_numar?.toString(),
+            anexa_data: uniqueEtapa.anexa_data,
+            subproiect_id: uniqueEtapa.subproiect_id,
+            monedaOriginala: monedaEtapa,
+            valoareOriginala: valoareEstimata,
+            cursValutar: cursEtapa
+          }];
+        });
+
+        // Marchează etapa ca adăugată în selectorul de etape disponibile
+        setEtapeDisponibile(prev => prev.map(et => {
+          const currentEtapaId = et.ID_Etapa || et.ID_Anexa;
+          return currentEtapaId === etapaId ? { ...et, adaugat: true } : et;
+        }));
+      }
+
       if (toateEtapele.length > 0) {
         showToast(`📋 Găsite ${toateEtapele.length} etape disponibile pentru facturare`, 'success');
       } else if (contract) {
