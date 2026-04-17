@@ -177,6 +177,45 @@ export async function GET(request: NextRequest) {
       types.proiectId = 'STRING';
     }
 
+    // P4 17.04.2026: Aliniere filtre cu API-ul Proiecte
+    // Semantica: filtrăm pe PROIECTUL PĂRINTE pentru a returna doar subproiectele
+    // ai căror părinți trec filtrele (consistent cu UI-ul — subproiectele sunt
+    // afișate doar sub proiectele vizibile)
+    const client = searchParams.get('client');
+    if (client) {
+      conditions.push('LOWER(COALESCE(p.Client, "")) LIKE LOWER(@client)');
+      params.client = `%${client}%`;
+      types.client = 'STRING';
+    }
+
+    const dataStartFrom = searchParams.get('data_start_start');
+    if (dataStartFrom) {
+      conditions.push('p.Data_Start >= @dataStartFrom');
+      params.dataStartFrom = dataStartFrom;
+      types.dataStartFrom = 'DATE';
+    }
+
+    const dataStartTo = searchParams.get('data_start_end');
+    if (dataStartTo) {
+      conditions.push('p.Data_Start <= @dataStartTo');
+      params.dataStartTo = dataStartTo;
+      types.dataStartTo = 'DATE';
+    }
+
+    const valoareMin = searchParams.get('valoare_min');
+    if (valoareMin && !isNaN(Number(valoareMin))) {
+      conditions.push('CAST(COALESCE(p.valoare_ron, p.Valoare_Estimata, 0) AS FLOAT64) >= @valoareMin');
+      params.valoareMin = Number(valoareMin);
+      types.valoareMin = 'NUMERIC';
+    }
+
+    const valoareMax = searchParams.get('valoare_max');
+    if (valoareMax && !isNaN(Number(valoareMax))) {
+      conditions.push('CAST(COALESCE(p.valoare_ron, p.Valoare_Estimata, 0) AS FLOAT64) <= @valoareMax');
+      params.valoareMax = Number(valoareMax);
+      types.valoareMax = 'NUMERIC';
+    }
+
     if (conditions.length > 0) {
       query += ' AND ' + conditions.join(' AND ');
     }
