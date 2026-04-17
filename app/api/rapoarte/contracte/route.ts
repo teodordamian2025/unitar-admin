@@ -229,12 +229,21 @@ const calculateFacturareStatus = (factureData: any[]): { status: string, display
   };
 };
 
-// NOU: Încărcarea facturilor directe pentru contract (din EtapeFacturi_v2 cu tip_etapa='factura_directa')
-// FIX 16.12.2025: Query modificat pentru a lua din EtapeFacturi_v2 în loc să excludă facturile cu înregistrări
-const loadFacturiDirecteContract = async (proiectId: string) => {
+// ============================================================================
+// P3 REFACTOR 17.04.2026: Batch loaders pentru eliminarea N+1
+// Înlocuiește 4 query-uri per contract (×50 contracte = 200+ queries)
+// cu 4-5 query-uri batch pentru întregul set de contracte.
+// ============================================================================
+
+// BATCH: Facturi directe pentru mai multe proiecte
+const loadFacturiDirecteBatch = async (proiectIds: string[]): Promise<Map<string, any[]>> => {
+  const map = new Map<string, any[]>();
+  if (proiectIds.length === 0) return map;
+
   try {
-    const facturiDirecteQuery = `
+    const query = `
       SELECT
+        ef.proiect_id,
         ef.factura_id,
         fg.serie,
         fg.numar,
@@ -248,99 +257,127 @@ const loadFacturiDirecteContract = async (proiectId: string) => {
         ef.activ
       FROM ${TABLE_ETAPE_FACTURI} ef
       JOIN ${TABLE_FACTURI_GENERATE} fg ON ef.factura_id = fg.id
-      WHERE ef.proiect_id = '${proiectId}'
+      WHERE ef.proiect_id IN UNNEST(@proiectIds)
         AND ef.tip_etapa = 'factura_directa'
         AND ef.activ = true
-      ORDER BY ef.data_facturare DESC
+      ORDER BY ef.proiect_id, ef.data_facturare DESC
     `;
 
-    const [facturiRows] = await bigquery.query({
-      query: facturiDirecteQuery,
+    const [rows] = await bigquery.query({
+      query,
+      params: { proiectIds },
+      types: { proiectIds: ['STRING'] },
       location: 'EU',
     });
 
-    return facturiRows.map((row: any) => ({
-      factura_id: row.factura_id,
-      serie: row.serie,
-      numar: row.numar,
-      valoare: row.valoare,
-      moneda: row.moneda,
-      data_facturare: row.data_facturare,
-      data_incasare: row.data_incasare,
-      valoare_incasata: row.valoare_incasata,
-      status_incasare: row.status_incasare,
-      status_factura: row.status_factura,
-      activ: row.activ
-    }));
-  } catch (error) {
-    console.error(`[CONTRACTE] Eroare la încărcarea facturilor directe pentru proiectul ${proiectId}:`, error);
-    return [];
-  }
-};
-
-// NOU 02.02.2026: Calculare status_predare pentru contract
-// Logica: Dacă contractul are anexe legate de subproiecte → verifică status_predare din subproiecte
-//         Dacă nu are anexe/subproiecte → verifică status_predare din proiectul principal
-const calculateStatusPredareContract = async (proiectId: string, anexe: any[]): Promise<string> => {
-  try {
-    // Găsește subproiectele din anexe (cele cu subproiect_id setat)
-    const subproiectIds = Array.from(new Set(
-      anexe
-        .filter(a => a.subproiect_id && a.subproiect_id.trim())
-        .map(a => a.subproiect_id)
-    ));
-
-    if (subproiectIds.length > 0) {
-      // Verifică status_predare pentru toate subproiectele din anexe
-      const subproiecteQuery = `
-        SELECT ID_Subproiect, status_predare
-        FROM ${TABLE_SUBPROIECTE}
-        WHERE ID_Subproiect IN UNNEST(@subproiectIds)
-      `;
-
-      const [subproiecteRows] = await bigquery.query({
-        query: subproiecteQuery,
-        params: { subproiectIds },
-        types: { subproiectIds: ['STRING'] },
-        location: 'EU'
+    rows.forEach((row: any) => {
+      const pid = row.proiect_id;
+      if (!map.has(pid)) map.set(pid, []);
+      map.get(pid)!.push({
+        factura_id: row.factura_id,
+        serie: row.serie,
+        numar: row.numar,
+        valoare: row.valoare,
+        moneda: row.moneda,
+        data_facturare: row.data_facturare,
+        data_incasare: row.data_incasare,
+        valoare_incasata: row.valoare_incasata,
+        status_incasare: row.status_incasare,
+        status_factura: row.status_factura,
+        activ: row.activ
       });
-
-      // Dacă TOATE subproiectele sunt "Predat" → contract "Predat"
-      // Dacă cel puțin unul nu e predat → contract "Nepredat"
-      const toatePredate = subproiecteRows.length > 0 &&
-        subproiecteRows.every((s: any) => s.status_predare === 'Predat');
-
-      console.log(`[CONTRACTE] Status predare pentru proiect ${proiectId}: ${subproiecteRows.length} subproiecte din anexe, toate predate: ${toatePredate}`);
-      return toatePredate ? 'Predat' : 'Nepredat';
-    }
-
-    // Dacă nu are anexe cu subproiecte, verifică proiectul principal
-    const proiectQuery = `
-      SELECT status_predare
-      FROM ${TABLE_PROIECTE}
-      WHERE ID_Proiect = @proiectId
-      LIMIT 1
-    `;
-
-    const [proiectRows] = await bigquery.query({
-      query: proiectQuery,
-      params: { proiectId },
-      types: { proiectId: 'STRING' },
-      location: 'EU'
     });
 
-    const statusPredare = proiectRows[0]?.status_predare || 'Nepredat';
-    console.log(`[CONTRACTE] Status predare pentru proiect ${proiectId} (fără subproiecte în anexe): ${statusPredare}`);
-    return statusPredare;
-
+    return map;
   } catch (error) {
-    console.error(`[CONTRACTE] Eroare la calcularea status_predare pentru proiectul ${proiectId}:`, error);
-    return 'Nepredat';
+    console.error('[CONTRACTE] Eroare batch facturi directe:', error);
+    return map;
   }
 };
 
-// NOU: Încărcarea etapelor din EtapeContract cu informații de facturare
-const loadEtapeContractCuFacturi = async (contractId: string) => {
+// BATCH: Status_predare pentru mai multe contracte
+// Logica identică cu calculateStatusPredareContract, dar batch-uită
+const loadStatusPredareBatch = async (
+  contracts: Array<{ ID_Contract: string; proiect_id: string }>,
+  anexePerContract: Map<string, any[]>
+): Promise<Map<string, string>> => {
+  const result = new Map<string, string>();
+  if (contracts.length === 0) return result;
+
+  try {
+    // 1. Colectează toate subproiect_ids din anexele tuturor contractelor
+    const allSubproiectIds = new Set<string>();
+    anexePerContract.forEach((anexe: any[]) => {
+      anexe.forEach(a => {
+        if (a.subproiect_id && String(a.subproiect_id).trim()) {
+          allSubproiectIds.add(a.subproiect_id);
+        }
+      });
+    });
+
+    // 2. Query pentru statusuri subproiecte (în batch)
+    const subprStatusMap = new Map<string, string>();
+    if (allSubproiectIds.size > 0) {
+      const [rows] = await bigquery.query({
+        query: `
+          SELECT ID_Subproiect, status_predare
+          FROM ${TABLE_SUBPROIECTE}
+          WHERE ID_Subproiect IN UNNEST(@ids)
+        `,
+        params: { ids: Array.from(allSubproiectIds) },
+        types: { ids: ['STRING'] },
+        location: 'EU'
+      });
+      rows.forEach((r: any) => subprStatusMap.set(r.ID_Subproiect, r.status_predare || 'Nepredat'));
+    }
+
+    // 3. Query pentru statusuri proiecte (fallback când nu există anexe cu subproiecte)
+    const uniqueProiectIds = Array.from(new Set(contracts.map(c => c.proiect_id).filter(Boolean)));
+    const proiectStatusMap = new Map<string, string>();
+    if (uniqueProiectIds.length > 0) {
+      const [rows] = await bigquery.query({
+        query: `
+          SELECT ID_Proiect, status_predare
+          FROM ${TABLE_PROIECTE}
+          WHERE ID_Proiect IN UNNEST(@ids)
+        `,
+        params: { ids: uniqueProiectIds },
+        types: { ids: ['STRING'] },
+        location: 'EU'
+      });
+      rows.forEach((r: any) => proiectStatusMap.set(r.ID_Proiect, r.status_predare || 'Nepredat'));
+    }
+
+    // 4. Calculează per-contract (identic cu logica anterioară)
+    for (const c of contracts) {
+      const anexe = anexePerContract.get(c.ID_Contract) || [];
+      const subproiectIds = anexe
+        .filter(a => a.subproiect_id && String(a.subproiect_id).trim())
+        .map(a => a.subproiect_id as string);
+
+      if (subproiectIds.length > 0) {
+        // TOATE subproiectele trebuie să fie 'Predat' pentru a marca contractul ca 'Predat'
+        const toatePredate = subproiectIds.every(id => subprStatusMap.get(id) === 'Predat');
+        result.set(c.ID_Contract, toatePredate ? 'Predat' : 'Nepredat');
+      } else {
+        result.set(c.ID_Contract, proiectStatusMap.get(c.proiect_id) || 'Nepredat');
+      }
+    }
+
+    return result;
+  } catch (error) {
+    console.error('[CONTRACTE] Eroare batch status_predare:', error);
+    contracts.forEach(c => result.set(c.ID_Contract, 'Nepredat'));
+    return result;
+  }
+};
+
+// BATCH: Etape cu facturi pentru mai multe contracte
+// Returnează Map<contract_id, etape[]>
+const loadEtapeBatch = async (contractIds: string[]): Promise<Map<string, any[]>> => {
+  const result = new Map<string, any[]>();
+  if (contractIds.length === 0) return result;
+
   try {
     const etapeQuery = `
       SELECT
@@ -364,22 +401,27 @@ const loadEtapeContractCuFacturi = async (contractId: string) => {
         ON e.ID_Etapa = ef.etapa_id AND ef.activ = true
       LEFT JOIN ${TABLE_FACTURI_GENERATE} fg
         ON ef.factura_id = fg.id
-      WHERE e.contract_id = '${contractId}'
+      WHERE e.contract_id IN UNNEST(@contractIds)
         AND e.activ = true
-      ORDER BY e.etapa_index ASC
+      ORDER BY e.contract_id, e.etapa_index ASC
     `;
 
-    const [etapeRows] = await bigquery.query({
+    const [rows] = await bigquery.query({
       query: etapeQuery,
+      params: { contractIds },
+      types: { contractIds: ['STRING'] },
       location: 'EU',
     });
 
-    // Grupează etapele și facturile
-    const etapeMap = new Map();
-    
-    etapeRows.forEach((row: any) => {
+    // Grupează pe contract_id → Map<etapa_id, etapa_obj> pentru a combina facturile
+    const perContract = new Map<string, Map<string, any>>();
+
+    rows.forEach((row: any) => {
+      const cid = row.contract_id;
+      if (!perContract.has(cid)) perContract.set(cid, new Map());
+      const etapeMap = perContract.get(cid)!;
+
       const etapaId = row.ID_Etapa;
-      
       if (!etapeMap.has(etapaId)) {
         etapeMap.set(etapaId, {
           ID_Etapa: row.ID_Etapa,
@@ -392,7 +434,6 @@ const loadEtapeContractCuFacturi = async (contractId: string) => {
           termen_zile: row.termen_zile,
           subproiect_id: row.subproiect_id,
           subproiect_denumire: row.subproiect_denumire,
-          // NOU 02.02.2026: status_predare din subproiectul pereche
           status_predare: row.subproiect_id ? (row.subproiect_status_predare || 'Nepredat') : null,
           status_facturare: row.status_facturare,
           status_incasare: row.status_incasare,
@@ -406,7 +447,6 @@ const loadEtapeContractCuFacturi = async (contractId: string) => {
         });
       }
 
-      // Adaugă factura la etapă dacă există
       if (row.factura_id) {
         etapeMap.get(etapaId).facturi.push({
           factura_id: row.factura_id,
@@ -424,25 +464,32 @@ const loadEtapeContractCuFacturi = async (contractId: string) => {
       }
     });
 
-    // Calculează status pentru fiecare etapă
-    const etape = Array.from(etapeMap.values()).map(etapa => {
-      const factureStatus = calculateFacturareStatus(etapa.facturi);
-      return {
-        ...etapa,
-        status_facturare_display: factureStatus.display,
-        status_facturare_filtru: factureStatus.status
-      };
+    // Calculează status per etapă și transformă în Map<contract_id, etape[]>
+    perContract.forEach((etapeMap: Map<string, any>, cid: string) => {
+      const etape = Array.from(etapeMap.values()).map((etapa: any) => {
+        const factureStatus = calculateFacturareStatus(etapa.facturi);
+        return {
+          ...etapa,
+          status_facturare_display: factureStatus.display,
+          status_facturare_filtru: factureStatus.status
+        };
+      });
+      result.set(cid, etape);
     });
 
-    return etape;
+    return result;
   } catch (error) {
-    console.error(`[CONTRACTE] Eroare la încărcarea etapelor pentru contractul ${contractId}:`, error);
-    return [];
+    console.error('[CONTRACTE] Eroare batch etape:', error);
+    return result;
   }
 };
 
-// NOU: Încărcarea anexelor din AnexeContract cu informații de facturare
-const loadAnexeContractCuFacturi = async (contractId: string) => {
+// BATCH: Anexe cu facturi pentru mai multe contracte
+// Returnează Map<contract_id, anexe[]>
+const loadAnexeBatch = async (contractIds: string[]): Promise<Map<string, any[]>> => {
+  const result = new Map<string, any[]>();
+  if (contractIds.length === 0) return result;
+
   try {
     const anexeQuery = `
       SELECT
@@ -466,22 +513,28 @@ const loadAnexeContractCuFacturi = async (contractId: string) => {
         ON a.ID_Anexa = ef.anexa_id AND ef.activ = true
       LEFT JOIN ${TABLE_FACTURI_GENERATE} fg
         ON ef.factura_id = fg.id
-      WHERE a.contract_id = '${contractId}'
+      WHERE a.contract_id IN UNNEST(@contractIds)
         AND a.activ = true
-      ORDER BY a.anexa_numar ASC, a.etapa_index ASC
+      ORDER BY a.contract_id, a.anexa_numar ASC, a.etapa_index ASC
     `;
 
-    const [anexeRows] = await bigquery.query({
+    const [rows] = await bigquery.query({
       query: anexeQuery,
+      params: { contractIds },
+      types: { contractIds: ['STRING'] },
       location: 'EU',
     });
 
-    // Grupează anexele după anexa_numar
-    const anexeMap = new Map();
-    
-    anexeRows.forEach((row: any) => {
+    // Map<contract_id, Map<anexa_key, anexa_obj>> pentru a combina facturile
+    const perContract = new Map<string, Map<string, any>>();
+
+    rows.forEach((row: any) => {
+      const cid = row.contract_id;
+      if (!perContract.has(cid)) perContract.set(cid, new Map());
+      const anexeMap = perContract.get(cid)!;
+
       const anexaKey = `${row.anexa_numar}_${row.ID_Anexa}`;
-      
+
       if (!anexeMap.has(anexaKey)) {
         anexeMap.set(anexaKey, {
           ID_Anexa: row.ID_Anexa,
@@ -496,14 +549,13 @@ const loadAnexeContractCuFacturi = async (contractId: string) => {
           termen_zile: row.termen_zile,
           subproiect_id: row.subproiect_id,
           subproiect_denumire: row.subproiect_denumire,
-          // NOU 02.02.2026: status_predare din subproiectul pereche
           status_predare: row.subproiect_id ? (row.subproiect_status_predare || 'Nepredat') : null,
           status_facturare: row.status_facturare,
           status_incasare: row.status_incasare,
           data_scadenta: parseDate(row.data_scadenta),
           data_start: parseDate(row.data_start),
           data_final: parseDate(row.data_final),
-          status: row.status, // ✅ ADĂUGAT: Status anexă pentru afișare în lista contracte
+          status: row.status,
           curs_valutar: convertBigQueryNumeric(row.curs_valutar),
           data_curs_valutar: parseDate(row.data_curs_valutar),
           procent_din_total: convertBigQueryNumeric(row.procent_din_total),
@@ -514,7 +566,6 @@ const loadAnexeContractCuFacturi = async (contractId: string) => {
         });
       }
 
-      // Adaugă factura la anexă dacă există
       if (row.factura_id) {
         anexeMap.get(anexaKey).facturi.push({
           factura_id: row.factura_id,
@@ -532,20 +583,22 @@ const loadAnexeContractCuFacturi = async (contractId: string) => {
       }
     });
 
-    // Calculează status pentru fiecare anexă
-    const anexe = Array.from(anexeMap.values()).map(anexa => {
-      const factureStatus = calculateFacturareStatus(anexa.facturi);
-      return {
-        ...anexa,
-        status_facturare_display: factureStatus.display,
-        status_facturare_filtru: factureStatus.status
-      };
+    perContract.forEach((anexeMap: Map<string, any>, cid: string) => {
+      const anexe = Array.from(anexeMap.values()).map((anexa: any) => {
+        const factureStatus = calculateFacturareStatus(anexa.facturi);
+        return {
+          ...anexa,
+          status_facturare_display: factureStatus.display,
+          status_facturare_filtru: factureStatus.status
+        };
+      });
+      result.set(cid, anexe);
     });
 
-    return anexe;
+    return result;
   } catch (error) {
-    console.error(`[CONTRACTE] Eroare la încărcarea anexelor pentru contractul ${contractId}:`, error);
-    return [];
+    console.error('[CONTRACTE] Eroare batch anexe:', error);
+    return result;
   }
 };
 // GET - Listare și căutare contracte (MODIFICAT pentru includerea etapelor și anexelor cu status facturare)
@@ -672,27 +725,42 @@ export async function GET(request: NextRequest) {
       location: 'EU',
     });
 
-    // NOU: Procesarea contractelor cu încărcarea etapelor și anexelor
-    const contracteProcesate = await Promise.all(rows.map(async (contract: any) => {
+    // P3 REFACTOR 17.04.2026: Batch loading pentru eliminarea N+1
+    // Înainte: 4 query-uri × N contracte = 200+ query-uri per request
+    // Acum: 4 query-uri batch pentru întreaga pagină
+    const contractIds: string[] = rows.map((r: any) => r.ID_Contract);
+    const proiectIdsUnique: string[] = Array.from(
+      new Set(rows.map((r: any) => r.proiect_id).filter(Boolean))
+    );
+
+    console.log(`[CONTRACTE] Batch loading pentru ${contractIds.length} contracte, ${proiectIdsUnique.length} proiecte`);
+
+    const [etapePerContract, anexePerContract, facturiDirectePerProiect] = await Promise.all([
+      loadEtapeBatch(contractIds),
+      loadAnexeBatch(contractIds),
+      loadFacturiDirecteBatch(proiectIdsUnique)
+    ]);
+
+    // Status_predare depinde de anexe, deci rulează după ce le-am încărcat
+    const statusPredareMap = await loadStatusPredareBatch(
+      rows.map((r: any) => ({ ID_Contract: r.ID_Contract, proiect_id: r.proiect_id })),
+      anexePerContract
+    );
+
+    // Procesarea finală rulează sincron - mai rapid, fără query-uri în loop
+    const contracteProcesate = rows.map((contract: any) => {
       const continutJson = parseJsonField(contract.continut_json);
 
-      // Încarcă etapele din EtapeContract cu informații de facturare
-      const etape = await loadEtapeContractCuFacturi(contract.ID_Contract);
-
-      // Încarcă anexele din AnexeContract cu informații de facturare
-      const anexe = await loadAnexeContractCuFacturi(contract.ID_Contract);
-
-      // NOU 02.02.2026: Calculează status_predare bazat pe anexe/subproiecte sau proiect
-      const statusPredare = await calculateStatusPredareContract(contract.proiect_id, anexe);
-
-      // NOU: Încarcă facturile directe (fără etape/anexe) pentru contract
-      const facturiDirecte = await loadFacturiDirecteContract(contract.proiect_id);
+      const etape = etapePerContract.get(contract.ID_Contract) || [];
+      const anexe = anexePerContract.get(contract.ID_Contract) || [];
+      const facturiDirecte = facturiDirectePerProiect.get(contract.proiect_id) || [];
+      const statusPredare = statusPredareMap.get(contract.ID_Contract) || 'Nepredat';
 
       // Calculează status de facturare general pentru contract
       const toateFacturile = [
-        ...etape.flatMap(e => e.facturi || []),
-        ...anexe.flatMap(a => a.facturi || []),
-        ...facturiDirecte  // Adaugă facturile directe
+        ...etape.flatMap((e: any) => e.facturi || []),
+        ...anexe.flatMap((a: any) => a.facturi || []),
+        ...facturiDirecte
       ];
 
       const statusFacturareContract = calculateFacturareStatus(toateFacturile);
@@ -754,7 +822,7 @@ export async function GET(request: NextRequest) {
         Observatii: contract.Observatii,
         versiune: contract.versiune || 1
       };
-    }));
+    });
 
     // NOU: Aplicare filtru status facturare după procesare
     let contracteFiltrate = contracteProcesate;
