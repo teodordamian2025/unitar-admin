@@ -145,6 +145,8 @@ export default function PlanningOverviewPage() {
   const [orePerAlocare, setOrePerAlocare] = useState<Record<string, number>>({});
   const [observatiiPerAlocare, setObservatiiPerAlocare] = useState<Record<string, string>>({});
   const [existingTimeEntries, setExistingTimeEntries] = useState<Record<string, boolean>>({});
+  // Detalii ore inregistrate per alocare (array de ore individuale)
+  const [timeEntriesPerAlocare, setTimeEntriesPerAlocare] = useState<Record<string, number[]>>({});
 
   // Verificare rol utilizator
   useEffect(() => {
@@ -637,16 +639,68 @@ export default function PlanningOverviewPage() {
     }
   }, []);
 
+  // Funcție pentru încărcarea detaliilor ore înregistrate per alocare
+  const fetchTimeEntriesDetails = useCallback(async (planificari: Planificare[], userId: string, date: string) => {
+    try {
+      const params = new URLSearchParams({
+        utilizator_uid: userId,
+        data_lucru: date,
+        limit: '200'
+      });
+      const response = await fetch(`/api/rapoarte/timetracking?${params}`);
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        const entriesMap: Record<string, number[]> = {};
+        const usedEntries = new Set<number>();
+
+        for (const p of planificari) {
+          const matchingEntries: number[] = [];
+
+          for (let i = 0; i < result.data.length; i++) {
+            if (usedEntries.has(i)) continue;
+            const entry = result.data[i];
+            let matched = false;
+
+            if (p.sarcina_id && entry.sarcina_id === p.sarcina_id) {
+              matched = true;
+            } else if (p.subproiect_id && !p.sarcina_id && entry.subproiect_id === p.subproiect_id) {
+              matched = true;
+            } else if (p.proiect_id && !p.subproiect_id && !p.sarcina_id) {
+              if (entry.proiect_id === p.proiect_id && !entry.subproiect_id && !entry.sarcina_id) {
+                matched = true;
+              }
+            }
+
+            if (matched) {
+              usedEntries.add(i);
+              matchingEntries.push(parseFloat(entry.ore_lucrate) || 0);
+            }
+          }
+
+          if (matchingEntries.length > 0) {
+            entriesMap[p.id] = matchingEntries;
+          }
+        }
+
+        setTimeEntriesPerAlocare(entriesMap);
+      }
+    } catch (error) {
+      console.error('Eroare la încărcarea detaliilor timp:', error);
+    }
+  }, []);
+
   // Verifică înregistrări existente când se deschide modalul de detalii
   useEffect(() => {
     if (selectedCell && selectedCell.planificari.length > 0) {
       checkExistingTimeEntries(selectedCell.planificari, selectedCell.uid, selectedCell.data);
+      fetchTimeEntriesDetails(selectedCell.planificari, selectedCell.uid, selectedCell.data);
       // Reset selecțiile când se schimbă celula
       setSelectedAlocariForTime(new Set());
       setOrePerAlocare({});
       setObservatiiPerAlocare({});
     }
-  }, [selectedCell, checkExistingTimeEntries]);
+  }, [selectedCell, checkExistingTimeEntries, fetchTimeEntriesDetails]);
 
   // Funcție pentru înregistrarea timpului pentru alocările selectate
   // OPTIMISTIC UI: Actualizăm UI-ul instant, API calls în background
@@ -688,6 +742,7 @@ export default function PlanningOverviewPage() {
     const alocareIdsToRegister = alocariToRegister.map(a => a.alocareId);
     const previousRegisteredIds = new Set(registeredAlocariIds);
     const previousExistingEntries = { ...existingTimeEntries };
+    const previousTimeEntriesPerAlocare = { ...timeEntriesPerAlocare };
 
     setRegisteredAlocariIds(prev => {
       const newSet = new Set(prev);
@@ -704,6 +759,15 @@ export default function PlanningOverviewPage() {
     setExistingTimeEntries(prev => {
       const newMap = { ...prev };
       alocareIdsToRegister.forEach(id => { newMap[id] = true; });
+      return newMap;
+    });
+
+    // Optimistic update pentru marcajul ore înregistrate
+    setTimeEntriesPerAlocare(prev => {
+      const newMap = { ...prev };
+      for (const { alocareId, ore } of alocariToRegister) {
+        newMap[alocareId] = [...(newMap[alocareId] || []), ore];
+      }
       return newMap;
     });
 
@@ -773,6 +837,19 @@ export default function PlanningOverviewPage() {
         const newMap = { ...prev };
         failedIds.forEach(id => {
           if (!previousExistingEntries[id]) delete newMap[id];
+        });
+        return newMap;
+      });
+
+      // Rollback timeEntriesPerAlocare
+      setTimeEntriesPerAlocare(prev => {
+        const newMap = { ...prev };
+        failedIds.forEach(id => {
+          if (previousTimeEntriesPerAlocare[id]) {
+            newMap[id] = previousTimeEntriesPerAlocare[id];
+          } else {
+            delete newMap[id];
+          }
         });
         return newMap;
       });
@@ -1503,6 +1580,29 @@ export default function PlanningOverviewPage() {
                         : 'Fără alocări'}
                     </div>
                   </div>
+                  {/* Marcaj total ore înregistrate */}
+                  {(() => {
+                    const allEntries = Object.values(timeEntriesPerAlocare).flat();
+                    const totalRegistered = allEntries.reduce((a, b) => a + b, 0);
+                    if (totalRegistered === 0) return null;
+                    const breakdown = allEntries.length > 1
+                      ? `(${allEntries.map(e => `${e}h`).join('+')})`
+                      : '';
+                    return (
+                      <div style={{
+                        fontSize: '0.95rem',
+                        fontWeight: '700',
+                        color: '#16a34a',
+                        background: '#f0fdf4',
+                        border: '1px solid #bbf7d0',
+                        borderRadius: '8px',
+                        padding: '4px 12px',
+                        whiteSpace: 'nowrap'
+                      }}>
+                        Inregistrat {totalRegistered}h{breakdown}
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* Butoane acțiuni */}
@@ -1729,6 +1829,25 @@ export default function PlanningOverviewPage() {
                                     ? '⚠️ Există înregistrări anterioare'
                                     : 'Bifează pentru înregistrare timp'}
                                 </span>
+                                {/* Marcaj permanent ore înregistrate per alocare */}
+                                {timeEntriesPerAlocare[p.id] && timeEntriesPerAlocare[p.id].length > 0 && (
+                                  <span style={{
+                                    marginLeft: 'auto',
+                                    fontSize: '0.7rem',
+                                    fontWeight: '700',
+                                    color: '#16a34a',
+                                    background: '#f0fdf4',
+                                    border: '1px solid #bbf7d0',
+                                    borderRadius: '6px',
+                                    padding: '2px 8px',
+                                    whiteSpace: 'nowrap'
+                                  }}>
+                                    Inregistrat {timeEntriesPerAlocare[p.id].reduce((a: number, b: number) => a + b, 0)}h
+                                    {timeEntriesPerAlocare[p.id].length > 1
+                                      ? `(${timeEntriesPerAlocare[p.id].map((e: number) => `${e}h`).join('+')})`
+                                      : ''}
+                                  </span>
+                                )}
                               </div>
 
                               <div style={{

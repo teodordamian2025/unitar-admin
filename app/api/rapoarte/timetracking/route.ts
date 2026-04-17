@@ -69,14 +69,14 @@ export async function GET(request: NextRequest) {
       const validareQuery = `
         SELECT COALESCE(SUM(ore_lucrate), 0) as total_ore_ziua
         FROM ${TIMETRACKING_TABLE}
-        WHERE utilizator_uid = @utilizator_uid 
-        AND data_lucru = @data_lucru
+        WHERE utilizator_uid = @utilizator_uid
+        AND data_lucru = DATE(@data_lucru)
       `;
 
       const [rows] = await bigquery.query({
         query: validareQuery,
         params: { utilizator_uid: utilizatorUid, data_lucru: dataLucru },
-        types: { utilizator_uid: 'STRING', data_lucru: 'DATE' },
+        types: { utilizator_uid: 'STRING', data_lucru: 'STRING' },
         location: 'EU',
       });
 
@@ -109,7 +109,7 @@ export async function GET(request: NextRequest) {
         LEFT JOIN ${SUBPROIECTE_TABLE_BATCH} sp ON tt.subproiect_id = sp.ID_Subproiect
         LEFT JOIN ${SUBPROIECTE_TABLE_BATCH} sp_sarcina ON s.tip_proiect = 'subproiect' AND s.proiect_id = sp_sarcina.ID_Subproiect
         WHERE tt.utilizator_uid = @utilizatorUid
-        AND tt.data_lucru = @dataLucru
+        AND tt.data_lucru = DATE(@dataLucru)
         AND (
           tt.proiect_id IN UNNEST(@proiectIds)
           OR sp.ID_Proiect IN UNNEST(@proiectIds)
@@ -127,7 +127,7 @@ export async function GET(request: NextRequest) {
         },
         types: {
           utilizatorUid: 'STRING',
-          dataLucru: 'DATE',
+          dataLucru: 'STRING',
           proiectIds: ['STRING']
         },
         location: 'EU',
@@ -193,9 +193,9 @@ export async function GET(request: NextRequest) {
     }
 
     if (dataLucru) {
-      conditions.push('tt.data_lucru = @dataLucru');
+      conditions.push('tt.data_lucru = DATE(@dataLucru)');
       params.dataLucru = dataLucru;
-      types.dataLucru = 'DATE';
+      types.dataLucru = 'STRING';
     }
 
     // FIX 19.01.2026: Filtrare corectă pentru a include doar înregistrările care aparțin proiectului specificat
@@ -342,21 +342,21 @@ export async function POST(request: NextRequest) {
     const checkTotalQuery = `
       SELECT SUM(ore_lucrate) as total_ore
       FROM \`${process.env.GOOGLE_CLOUD_PROJECT_ID}.${dataset}.${table}\`
-      WHERE utilizator_uid = @utilizatorUid 
-        AND data_lucru = @dataLucru
+      WHERE utilizator_uid = @utilizatorUid
+        AND data_lucru = DATE(@dataLucru)
         AND id != @currentId
     `;
 
     const [totalRows] = await bigquery.query({
       query: checkTotalQuery,
-      params: { 
-        utilizatorUid: utilizator_uid, 
+      params: {
+        utilizatorUid: utilizator_uid,
         dataLucru: data_lucru,
-        currentId: id 
+        currentId: id
       },
-      types: { 
-        utilizatorUid: 'STRING', 
-        dataLucru: 'DATE',
+      types: {
+        utilizatorUid: 'STRING',
+        dataLucru: 'STRING',
         currentId: 'STRING'
       },
       location: 'EU',
