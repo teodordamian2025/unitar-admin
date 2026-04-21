@@ -210,7 +210,7 @@ export default function ProiectDetailsPage() {
     if (!proiectId) return;
 
     try {
-      const response = await fetch(`/api/rapoarte/proiecte/${proiectId}`);
+      const response = await fetch(`/api/rapoarte/proiecte/${encodeURIComponent(proiectId)}`);
       if (response.ok) {
         const data = await response.json();
         setProiect(data.proiect);
@@ -519,7 +519,7 @@ export default function ProiectDetailsPage() {
     if (!proiectId) return;
 
     try {
-      const response = await fetch(`/api/rapoarte/proiecte/${proiectId}`, {
+      const response = await fetch(`/api/rapoarte/proiecte/${encodeURIComponent(proiectId)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ [field]: value })
@@ -593,7 +593,7 @@ export default function ProiectDetailsPage() {
 
     setIsSavingProgresProiect(true);
     try {
-      const response = await fetch(`/api/rapoarte/proiecte/${proiectId}`, {
+      const response = await fetch(`/api/rapoarte/proiecte/${encodeURIComponent(proiectId)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ progres_procent: value })
