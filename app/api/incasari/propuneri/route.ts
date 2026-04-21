@@ -53,6 +53,54 @@ export async function GET(request: NextRequest) {
 
     const whereClause = whereConditions.join(' AND ');
 
+    // Auto-cleanup: respinge automat propunerile pending care au devenit obsolete
+    // (factura a fost achitata sau tranzactia a fost matched prin alt flow)
+    // Se aplica doar cand vizualizam 'pending' sau 'all' pentru a evita UPDATE-uri inutile
+    if (status === 'pending' || status === 'all') {
+      try {
+        await bigquery.query(`
+          UPDATE \`${PROJECT_ID}.${DATASET}.IncasariPropuneri_v2\` p
+          SET
+            status = 'rejected',
+            motiv_respingere = 'Auto: Factura sau tranzactie deja procesata',
+            data_respingere = CURRENT_TIMESTAMP(),
+            respins_de = 'system_cleanup'
+          FROM (
+            SELECT
+              p2.id,
+              fg.status AS fg_status,
+              fe.status_achitare AS fe_status_achitare,
+              tb.matching_tip AS tb_matching_tip
+            FROM \`${PROJECT_ID}.${DATASET}.IncasariPropuneri_v2\` p2
+            LEFT JOIN \`${PROJECT_ID}.${DATASET}.FacturiGenerate_v2\` fg
+              ON p2.factura_id = fg.id AND COALESCE(p2.factura_sursa, 'facturi_generate') = 'facturi_generate'
+            LEFT JOIN \`${PROJECT_ID}.${DATASET}.FacturiEmiseANAF_v2\` fe
+              ON p2.factura_id = fe.id AND p2.factura_sursa = 'facturi_emise_anaf'
+            LEFT JOIN \`${PROJECT_ID}.${DATASET}.TranzactiiBancare_v2\` tb
+              ON p2.tranzactie_id = tb.id
+            WHERE p2.status = 'pending'
+          ) sub
+          WHERE p.id = sub.id
+            AND p.status = 'pending'
+            AND (
+              -- Factura interna deja platita/anulata/storno
+              (COALESCE(p.factura_sursa, 'facturi_generate') = 'facturi_generate'
+               AND sub.fg_status IN ('platita', 'anulata', 'storno', 'stornata'))
+              OR
+              -- Factura externa deja incasata
+              (p.factura_sursa = 'facturi_emise_anaf'
+               AND sub.fe_status_achitare = 'Incasat')
+              OR
+              -- Tranzactie deja matched prin alt flow
+              (sub.tb_matching_tip IS NOT NULL AND sub.tb_matching_tip != 'none')
+            )
+        `);
+      } catch (cleanupError: any) {
+        // Nu blocam listarea daca cleanup-ul esueaza
+        console.error('⚠️  [Propuneri Cleanup] Eroare auto-respingere obsolete:', cleanupError.message);
+      }
+    }
+
     // Query principal - suportă atât facturi interne (FacturiGenerate) cât și externe (FacturiEmiseANAF)
     const [propuneri] = await bigquery.query(`
       SELECT
