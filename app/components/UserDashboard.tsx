@@ -87,9 +87,16 @@ export default function UserDashboard() {
     try {
       setLoadingData(true);
 
+      if (!user) return;
+
       // Conectare la API real pentru utilizatori normali
       console.log('🔄 Loading real user dashboard data...');
-      const response = await fetch(`/api/user/dashboard?user_id=${user?.uid}`);
+      const idToken = await user.getIdToken();
+      const response = await fetch('/api/user/dashboard', {
+        headers: {
+          'Authorization': `Bearer ${idToken}`
+        }
+      });
 
       if (!response.ok) {
         throw new Error(`API Error: ${response.status}`);
