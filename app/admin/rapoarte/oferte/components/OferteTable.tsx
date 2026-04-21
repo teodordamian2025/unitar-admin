@@ -361,7 +361,7 @@ export default function OferteTable({ searchParams, onKpiLoaded, refreshKey, onR
                     <td style={{ padding: '12px 16px', fontSize: '13px', whiteSpace: 'nowrap' as const }}>{formatDate(oferta.data_expirare)}</td>
                     <td style={{ padding: '12px 16px' }}>
                       {oferta.proiect_id_legat ? (
-                        <a href={`/admin/rapoarte/proiecte/${oferta.proiect_id_legat}`} style={{ color: '#8e44ad', fontWeight: '500', fontSize: '12px', textDecoration: 'none' }}>
+                        <a href={`/admin/rapoarte/proiecte/${encodeURIComponent(oferta.proiect_id_legat)}`} style={{ color: '#8e44ad', fontWeight: '500', fontSize: '12px', textDecoration: 'none' }}>
                           {oferta.proiect_legat_denumire || 'Vezi proiect'}
                         </a>
                       ) : (

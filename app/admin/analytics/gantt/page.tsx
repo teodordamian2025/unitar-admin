@@ -2435,7 +2435,7 @@ export default function GanttView() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => router.push(`/admin/rapoarte/proiecte/${selectedTask.parentId || selectedTask.id}`)}
+                onClick={() => router.push(`/admin/rapoarte/proiecte/${encodeURIComponent(selectedTask.parentId || selectedTask.id)}`)}
               >
                 Vezi Proiectul
               </Button>

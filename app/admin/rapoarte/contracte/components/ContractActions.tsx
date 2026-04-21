@@ -309,7 +309,7 @@ export default function ContractActions({
   // NOU: Handler pentru navigare la pagina proiectului
   const handleViewProject = () => {
     if (contract.proiect_id) {
-      window.location.href = `/admin/rapoarte/proiecte/${contract.proiect_id}`;
+      window.location.href = `/admin/rapoarte/proiecte/${encodeURIComponent(contract.proiect_id)}`;
     } else {
       showToast('Contractul nu are un proiect asociat', 'error');
     }

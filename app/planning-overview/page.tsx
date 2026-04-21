@@ -2083,7 +2083,7 @@ export default function PlanningOverviewPage() {
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      router.push(`/projects/${parentId}`);
+                                      router.push(`/projects/${encodeURIComponent(parentId)}`);
                                     }}
                                     style={{
                                       marginTop: '0.5rem',

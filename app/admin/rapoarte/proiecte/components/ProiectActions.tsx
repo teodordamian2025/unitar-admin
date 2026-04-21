@@ -311,7 +311,7 @@ export default function ProiectActions({
 
   const handleViewDetails = async () => {
     // Redirect către pagina de detalii proiect
-    router.push(`/admin/rapoarte/proiecte/${proiect.ID_Proiect}`);
+    router.push(`/admin/rapoarte/proiecte/${encodeURIComponent(proiect.ID_Proiect)}`);
   };
 
   const handleEdit = async () => {

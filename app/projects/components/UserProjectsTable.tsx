@@ -387,7 +387,7 @@ export default function UserProjectsTable({ searchParams }: UserProjectsTablePro
   };
 
   const handleNavigateToDetails = (projectId: string) => {
-    router.push(`/projects/${projectId}`);
+    router.push(`/projects/${encodeURIComponent(projectId)}`);
   };
 
   const formatDate = (dateValue: any): string => {

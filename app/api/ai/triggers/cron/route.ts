@@ -95,7 +95,7 @@ async function sendTriggerNotification(baseUrl: string, trigger: any) {
           actiune: trigger.actiune_sugerata,
           trigger_id: trigger.id || '',
           link_detalii: trigger.entity_type === 'proiect'
-            ? `/admin/rapoarte/proiecte?search=${trigger.entity_id}`
+            ? `/admin/rapoarte/proiecte?search=${encodeURIComponent(trigger.entity_id || '')}`
             : '/admin/rapoarte/proiecte',
         },
       }),

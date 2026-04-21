@@ -835,8 +835,8 @@ export async function POST(request: NextRequest) {
           // FIX 13.01.2026: Generează link direct la detalii proiect în funcție de rolul utilizatorului
           const userRol = responsabilUser.rol || 'normal';
           const linkDetalii = userRol === 'admin'
-            ? `${baseUrl}/admin/rapoarte/proiecte/${ID_Proiect}`
-            : `${baseUrl}/projects/${ID_Proiect}`;
+            ? `${baseUrl}/admin/rapoarte/proiecte/${encodeURIComponent(ID_Proiect)}`
+            : `${baseUrl}/projects/${encodeURIComponent(ID_Proiect)}`;
 
           const notifyResponse = await fetch(`${baseUrl}/api/notifications/send`, {
             method: 'POST',

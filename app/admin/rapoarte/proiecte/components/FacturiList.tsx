@@ -1642,7 +1642,7 @@ export default function FacturiList({
                           onRetryANAF={() => handleRetryANAF(factura)}
                           onShowDetails={() => showEFacturaDetailsModal(factura)}
                           onDelete={() => handleDeleteFactura(factura)}
-                          onViewProject={() => factura.proiect_id && (window.location.href = `/admin/rapoarte/proiecte/${factura.proiect_id}`)}
+                          onViewProject={() => factura.proiect_id && (window.location.href = `/admin/rapoarte/proiecte/${encodeURIComponent(factura.proiect_id)}`)}
                           isProcessing={processingActions[factura.id]}
                         />
                       </td>

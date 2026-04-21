@@ -1397,7 +1397,7 @@ export default function CalendarView() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => router.push(`/admin/rapoarte/proiecte/${selectedEvent.proiect_id}`)}
+                onClick={() => router.push(`/admin/rapoarte/proiecte/${encodeURIComponent(selectedEvent.proiect_id)}`)}
               >
                 Vezi Proiectul
               </Button>

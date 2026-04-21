@@ -93,10 +93,11 @@ const userNotificationsMap = new Map<string, UserNotificationsGroup>();
 
 // Helper pentru generarea link-ului corect în funcție de rol
 function getProjectLink(baseUrl: string, proiectId: string, userRol: 'admin' | 'normal'): string {
+  const encodedId = encodeURIComponent(proiectId);
   if (userRol === 'admin') {
-    return `${baseUrl}/admin/rapoarte/proiecte/${proiectId}`;
+    return `${baseUrl}/admin/rapoarte/proiecte/${encodedId}`;
   }
-  return `${baseUrl}/projects/${proiectId}`;
+  return `${baseUrl}/projects/${encodedId}`;
 }
 
 // Helper pentru extragere dată din object BigQuery

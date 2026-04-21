@@ -1191,7 +1191,7 @@ const PlanificatorInteligent: React.FC<PlanificatorInteligentProps> = ({ user })
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        router.push(`/projects/${item.proiect_id_for_navigation}`);
+                                        router.push(`/projects/${encodeURIComponent(item.proiect_id_for_navigation!)}`);
                                       }}
                                       style={{
                                         background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
