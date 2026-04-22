@@ -45,6 +45,8 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status');
     // ✅ FIX 24.01.2026: Adăugat parametru search pentru căutare server-side
     const search = searchParams.get('search');
+    // Filtru dedicat pe client_nume (LIKE)
+    const clientName = searchParams.get('client');
     // ✅ FIX 24.01.2026: Mărit limita default la 100 și adăugat support pentru "all"
     const limitParam = searchParams.get('limit');
     const limit = limitParam === 'all' ? 10000 : parseInt(limitParam || '100');
@@ -178,6 +180,12 @@ export async function GET(request: NextRequest) {
       query += ' AND fg.status = @status';
       params.status = status;
       types.status = 'STRING';
+    }
+
+    if (clientName && clientName.trim()) {
+      query += ' AND LOWER(fg.client_nume) LIKE LOWER(@clientName)';
+      params.clientName = `%${clientName.trim()}%`;
+      types.clientName = 'STRING';
     }
 
     // ✅ FIX 24.01.2026: Adăugat căutare server-side pentru search

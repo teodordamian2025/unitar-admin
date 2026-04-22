@@ -31,6 +31,7 @@ import {
 import EditFacturaModal from './EditFacturaModal';
 import ChitantaModal from './ChitantaModal';
 import IncasareModal from './IncasareModal';
+import ClientAutocomplete from '@/app/components/ClientAutocomplete';
 
 // Declare global pentru jsPDF
 declare global {
@@ -150,6 +151,7 @@ export default function FacturiList({
     search: initialSearch, // Inițializat cu valoarea din URL dacă există
     scadenta: '',
     statusIncasari: '', // NOU: incasat_complet | incasat_partial | neincasat
+    client: '',
     perioada: '30'
   });
 
@@ -217,7 +219,7 @@ export default function FacturiList({
   // ✅ FIX 24.01.2026: Reset la pagina 1 când se schimbă filtrele
   useEffect(() => {
     setCurrentPage(1);
-  }, [proiectId, clientId, filters.search, filters.status, filters.scadenta, filters.statusIncasari, filters.perioada, customPeriod]);
+  }, [proiectId, clientId, filters.search, filters.status, filters.scadenta, filters.statusIncasari, filters.client, filters.perioada, customPeriod]);
 
   useEffect(() => {
     loadFacturi();
@@ -236,6 +238,11 @@ export default function FacturiList({
       // ✅ FIX 24.01.2026: Trimite search la server pentru căutare server-side
       if (filters.search && filters.search.trim()) {
         params.append('search', filters.search.trim());
+      }
+
+      // Filtru dedicat pe client (server-side LIKE pe client_nume)
+      if (filters.client && filters.client.trim()) {
+        params.append('client', filters.client.trim());
       }
 
       // ✅ FIX 24.01.2026: Adaugă parametri de paginare
@@ -1427,8 +1434,23 @@ export default function FacturiList({
               </select>
             </div>
 
-            {/* NOU: Rând 2 de filtre - Status Încasări și Perioada */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {/* NOU: Rând 2 de filtre - Client (cu autocomplete), Status Încasări și Perioada */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <ClientAutocomplete
+                value={filters.client}
+                onChange={(v) => setFilters({ ...filters, client: v })}
+                placeholder="Caută client sau scrie numele..."
+                inputStyle={{
+                  width: '100%',
+                  padding: '0.5rem 0.75rem',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '0.25rem',
+                  fontSize: '0.875rem',
+                  boxSizing: 'border-box',
+                  outline: 'none'
+                }}
+              />
+
               <select
                 value={filters.statusIncasari}
                 onChange={(e) => setFilters({...filters, statusIncasari: e.target.value})}
@@ -1445,7 +1467,7 @@ export default function FacturiList({
                 onChange={(e) => {
                   const perioada = e.target.value;
                   setFilters({...filters, perioada});
-                  
+
                   if (perioada === 'custom') {
                     setShowCustomPeriod(true);
                   } else {
@@ -1497,16 +1519,16 @@ export default function FacturiList({
             <FileText size={48} className="mx-auto text-gray-300" />
           </div>
           <div>
-            {filters.search || filters.status || filters.scadenta ? 
-              'Nu s-au gasit facturi cu criteriile specificate' : 
+            {filters.search || filters.status || filters.scadenta || filters.client ?
+              'Nu s-au gasit facturi cu criteriile specificate' :
               'Nu exista facturi generate'
             }
           </div>
-          {(filters.search || filters.status || filters.scadenta || filters.statusIncasari) && (
+          {(filters.search || filters.status || filters.scadenta || filters.statusIncasari || filters.client) && (
             <button
               onClick={() => {
                 setSearchInput('');
-                setFilters({search: '', status: '', scadenta: '', statusIncasari: '', perioada: '30'});
+                setFilters({search: '', status: '', scadenta: '', statusIncasari: '', client: '', perioada: '30'});
               }}
               className="mt-2 text-blue-600 underline"
             >

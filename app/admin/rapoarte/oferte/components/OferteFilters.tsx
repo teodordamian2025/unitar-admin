@@ -7,6 +7,8 @@
 
 'use client';
 
+import ClientAutocomplete from '@/app/components/ClientAutocomplete';
+
 interface FilterValues {
   search: string;
   status: string;
@@ -132,12 +134,11 @@ export default function OferteFilters({ values, onChange, onReset }: OferteFilte
 
         <div>
           <label style={{ fontSize: '12px', fontWeight: '600', color: '#7f8c8d', marginBottom: '4px', display: 'block' }}>Client</label>
-          <input
-            type="text"
-            placeholder="Numele clientului..."
+          <ClientAutocomplete
             value={values.client}
-            onChange={e => handleChange('client', e.target.value)}
-            style={inputStyle}
+            onChange={v => handleChange('client', v)}
+            placeholder="Caută client sau scrie numele..."
+            inputStyle={{ ...inputStyle, boxSizing: 'border-box' }}
           />
         </div>
 
