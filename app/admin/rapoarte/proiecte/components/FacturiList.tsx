@@ -159,6 +159,10 @@ export default function FacturiList({
   const [searchInput, setSearchInput] = useState(initialSearch);
   const searchDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
+  // State local pentru filtrul Client (debounced separat de filters.client)
+  const [clientInput, setClientInput] = useState('');
+  const clientDebounceRef = useRef<NodeJS.Timeout | null>(null);
+
   const [showCustomPeriod, setShowCustomPeriod] = useState(false);
   const [customPeriod, setCustomPeriod] = useState({
     dataStart: '',
@@ -214,6 +218,21 @@ export default function FacturiList({
       setFilters(prev => ({ ...prev, search: initialSearch }));
     }
   }, [initialSearch]);
+
+  // Debounce pentru input-ul Client (800ms, la fel ca search)
+  useEffect(() => {
+    if (clientDebounceRef.current) {
+      clearTimeout(clientDebounceRef.current);
+    }
+    clientDebounceRef.current = setTimeout(() => {
+      setFilters(prev => ({ ...prev, client: clientInput }));
+    }, 800);
+    return () => {
+      if (clientDebounceRef.current) {
+        clearTimeout(clientDebounceRef.current);
+      }
+    };
+  }, [clientInput]);
 
   // Încarcă facturile când se schimbă filtrele (dar nu searchInput direct)
   // ✅ FIX 24.01.2026: Reset la pagina 1 când se schimbă filtrele
@@ -1437,8 +1456,8 @@ export default function FacturiList({
             {/* NOU: Rând 2 de filtre - Client (cu autocomplete), Status Încasări și Perioada */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <ClientAutocomplete
-                value={filters.client}
-                onChange={(v) => setFilters({ ...filters, client: v })}
+                value={clientInput}
+                onChange={(v) => setClientInput(v)}
                 placeholder="Caută client sau scrie numele..."
                 inputStyle={{
                   width: '100%',
@@ -1528,6 +1547,7 @@ export default function FacturiList({
             <button
               onClick={() => {
                 setSearchInput('');
+                setClientInput('');
                 setFilters({search: '', status: '', scadenta: '', statusIncasari: '', client: '', perioada: '30'});
               }}
               className="mt-2 text-blue-600 underline"
