@@ -115,105 +115,33 @@ export default function DateEditButton({
   };
 
   // Close popup on outside click
+  // NOTA: Folosim 'click' în loc de 'mousedown' pentru că interacțiunile cu
+  // native date picker (navigare luni/ani) pot fire 'mousedown' pe document
+  // cu target neașteptat (body/html), închizând prematur popup-ul.
+  // De asemenea ignorăm target-urile INPUT type="date" pentru siguranță.
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
+      if (!target) return;
+
+      // Skip dacă target-ul este un input type="date" (interacțiune native picker)
+      if (target.tagName === 'INPUT' && (target as HTMLInputElement).type === 'date') {
+        return;
+      }
+
       if (showPopup && !target.closest('.date-edit-popup') && !target.closest('.date-edit-button')) {
         setShowPopup(false);
       }
     };
 
     if (showPopup) {
-      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('click', handleClickOutside);
     }
 
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('click', handleClickOutside);
     };
   }, [showPopup]);
-
-  // Popup Component
-  const EditPopup = () => {
-    if (!mounted) return null;
-
-    return createPortal(
-      <div
-        className="date-edit-popup"
-        style={{
-          position: 'absolute',
-          top: popupPosition.top,
-          left: popupPosition.left,
-          background: 'white',
-          borderRadius: '12px',
-          boxShadow: '0 10px 40px rgba(0, 0, 0, 0.2)',
-          border: '1px solid #e5e7eb',
-          padding: '1rem',
-          zIndex: 60000,
-          minWidth: '240px'
-        }}
-      >
-        <div style={{ marginBottom: '0.75rem' }}>
-          <label style={{
-            display: 'block',
-            fontSize: '0.8rem',
-            fontWeight: '600',
-            color: '#374151',
-            marginBottom: '0.5rem'
-          }}>
-            {dateField === 'Data_Start' ? '📅 Data de Start' : '🏁 Data de Final'}
-          </label>
-          <input
-            type="date"
-            value={newDate}
-            onChange={(e) => setNewDate(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '0.6rem',
-              border: '1px solid #d1d5db',
-              borderRadius: '8px',
-              fontSize: '0.875rem'
-            }}
-            autoFocus
-          />
-        </div>
-
-        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-          <button
-            onClick={handleCancel}
-            style={{
-              padding: '0.4rem 0.75rem',
-              background: '#f3f4f6',
-              color: '#374151',
-              border: '1px solid #d1d5db',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '0.8rem',
-              fontWeight: '500'
-            }}
-          >
-            Anulează
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={saving || !newDate}
-            style={{
-              padding: '0.4rem 0.75rem',
-              background: saving || !newDate ? '#9ca3af' : 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: saving || !newDate ? 'not-allowed' : 'pointer',
-              fontSize: '0.8rem',
-              fontWeight: '500'
-            }}
-          >
-            {saving ? '...' : 'Salvează'}
-          </button>
-        </div>
-      </div>,
-      document.body
-    );
-  };
 
   return (
     <>
@@ -253,7 +181,86 @@ export default function DateEditButton({
         ✏️
       </button>
 
-      {showPopup && <EditPopup />}
+      {/* IMPORTANT: Inline portal (NU component function nested) pentru a evita
+          remount-ul portalului la re-render-ul părintelui, care ar distruge
+          inputul și ar închide native date picker. */}
+      {showPopup && mounted && createPortal(
+        <div
+          className="date-edit-popup"
+          style={{
+            position: 'absolute',
+            top: popupPosition.top,
+            left: popupPosition.left,
+            background: 'white',
+            borderRadius: '12px',
+            boxShadow: '0 10px 40px rgba(0, 0, 0, 0.2)',
+            border: '1px solid #e5e7eb',
+            padding: '1rem',
+            zIndex: 60000,
+            minWidth: '240px'
+          }}
+        >
+          <div style={{ marginBottom: '0.75rem' }}>
+            <label style={{
+              display: 'block',
+              fontSize: '0.8rem',
+              fontWeight: '600',
+              color: '#374151',
+              marginBottom: '0.5rem'
+            }}>
+              {dateField === 'Data_Start' ? '📅 Data de Start' : '🏁 Data de Final'}
+            </label>
+            <input
+              type="date"
+              value={newDate}
+              onChange={(e) => setNewDate(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '0.6rem',
+                border: '1px solid #d1d5db',
+                borderRadius: '8px',
+                fontSize: '0.875rem'
+              }}
+              autoFocus
+            />
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+            <button
+              onClick={handleCancel}
+              style={{
+                padding: '0.4rem 0.75rem',
+                background: '#f3f4f6',
+                color: '#374151',
+                border: '1px solid #d1d5db',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '0.8rem',
+                fontWeight: '500'
+              }}
+            >
+              Anulează
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving || !newDate}
+              style={{
+                padding: '0.4rem 0.75rem',
+                background: saving || !newDate ? '#9ca3af' : 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: saving || !newDate ? 'not-allowed' : 'pointer',
+                fontSize: '0.8rem',
+                fontWeight: '500'
+              }}
+            >
+              {saving ? '...' : 'Salvează'}
+            </button>
+          </div>
+        </div>,
+        document.body
+      )}
     </>
   );
 }
