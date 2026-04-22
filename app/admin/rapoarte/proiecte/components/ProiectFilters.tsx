@@ -44,12 +44,10 @@ export default function ProiectFilters({
       ]
     },
     {
-      // MODIFICAT: Schimbat din 'select' în 'text' pentru căutare LIKE
       key: 'client',
       label: 'Client',
-      type: 'text', // Schimbat din 'select'
-      placeholder: 'Caută după nume client...' // Placeholder actualizat
-      // ELIMINAT: options array cu clientii fake
+      type: 'clientAutocomplete',
+      placeholder: 'Caută client sau scrie numele...'
     },
     {
       key: 'data_start',

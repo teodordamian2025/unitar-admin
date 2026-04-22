@@ -9,6 +9,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import ClientAutocomplete from '@/app/components/ClientAutocomplete';
 
 interface FilterValues {
   search: string;
@@ -282,12 +283,11 @@ export default function UserProjectFilters({ filters, onFilterChange }: UserProj
             }}>
               🏢 Client
             </label>
-            <input
-              type="text"
+            <ClientAutocomplete
               value={localFilters.client}
-              onChange={(e) => handleInputChange('client', e.target.value)}
-              placeholder="Numele clientului..."
-              style={{
+              onChange={(v) => handleInputChange('client', v)}
+              placeholder="Caută client sau scrie numele..."
+              inputStyle={{
                 width: '100%',
                 padding: '0.75rem',
                 border: '1px solid rgba(209, 213, 219, 0.5)',
@@ -295,15 +295,17 @@ export default function UserProjectFilters({ filters, onFilterChange }: UserProj
                 fontSize: '0.875rem',
                 background: 'rgba(255, 255, 255, 0.8)',
                 backdropFilter: 'blur(4px)',
-                transition: 'all 0.2s ease'
+                transition: 'all 0.2s ease',
+                boxSizing: 'border-box',
+                outline: 'none'
               }}
-              onFocus={(e) => {
-                e.currentTarget.style.borderColor = '#3b82f6';
-                e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
+              onFocusStyle={{
+                borderColor: '#3b82f6',
+                boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.1)'
               }}
-              onBlur={(e) => {
-                e.currentTarget.style.borderColor = 'rgba(209, 213, 219, 0.5)';
-                e.currentTarget.style.boxShadow = 'none';
+              onBlurStyle={{
+                borderColor: 'rgba(209, 213, 219, 0.5)',
+                boxShadow: 'none'
               }}
             />
           </div>

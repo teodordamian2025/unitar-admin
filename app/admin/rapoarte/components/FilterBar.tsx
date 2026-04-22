@@ -3,6 +3,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import ClientAutocomplete from '@/app/components/ClientAutocomplete';
 
 export interface FilterOption {
   value: string;
@@ -12,7 +13,7 @@ export interface FilterOption {
 export interface FilterConfig {
   key: string;
   label: string;
-  type: 'text' | 'select' | 'date' | 'dateRange';
+  type: 'text' | 'select' | 'date' | 'dateRange' | 'clientAutocomplete';
   options?: FilterOption[];
   placeholder?: string;
 }
@@ -156,6 +157,24 @@ export default function FilterBar({
                     borderRadius: '6px',
                     fontSize: '14px',
                     opacity: loading ? 0.6 : 1
+                  }}
+                />
+              )}
+
+              {filter.type === 'clientAutocomplete' && (
+                <ClientAutocomplete
+                  value={values[filter.key] || ''}
+                  onChange={(v) => handleFilterChange(filter.key, v)}
+                  placeholder={filter.placeholder}
+                  disabled={loading}
+                  inputStyle={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #ced4da',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    opacity: loading ? 0.6 : 1,
+                    boxSizing: 'border-box'
                   }}
                 />
               )}
