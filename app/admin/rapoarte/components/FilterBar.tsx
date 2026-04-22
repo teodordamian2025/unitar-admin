@@ -162,9 +162,9 @@ export default function FilterBar({
               )}
 
               {filter.type === 'clientAutocomplete' && (
-                <ClientAutocomplete
+                <ClientAutocompleteField
                   value={values[filter.key] || ''}
-                  onChange={(v) => handleFilterChange(filter.key, v)}
+                  onCommit={(v) => handleFilterChange(filter.key, v)}
                   placeholder={filter.placeholder}
                   disabled={loading}
                   inputStyle={{
@@ -261,3 +261,43 @@ export default function FilterBar({
   );
 }
 
+// Wrapper pentru ClientAutocomplete în FilterBar:
+// buffer local pentru typing, commit la parent doar la select/Enter/clear.
+interface ClientAutocompleteFieldProps {
+  value: string;
+  onCommit: (value: string) => void;
+  placeholder?: string;
+  disabled?: boolean;
+  inputStyle?: React.CSSProperties;
+}
+
+function ClientAutocompleteField({
+  value,
+  onCommit,
+  placeholder,
+  disabled,
+  inputStyle,
+}: ClientAutocompleteFieldProps) {
+  const [buffer, setBuffer] = useState(value);
+
+  useEffect(() => {
+    setBuffer(value);
+  }, [value]);
+
+  return (
+    <ClientAutocomplete
+      value={buffer}
+      onChange={(v) => {
+        setBuffer(v);
+        if (v === '' && value !== '') {
+          onCommit('');
+        }
+      }}
+      onSelect={(v) => onCommit(v)}
+      onEnter={(v) => onCommit(v)}
+      placeholder={placeholder}
+      disabled={disabled}
+      inputStyle={inputStyle}
+    />
+  );
+}

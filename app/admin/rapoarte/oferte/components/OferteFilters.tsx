@@ -7,6 +7,7 @@
 
 'use client';
 
+import { useEffect, useState } from 'react';
 import ClientAutocomplete from '@/app/components/ClientAutocomplete';
 
 interface FilterValues {
@@ -61,6 +62,12 @@ export default function OferteFilters({ values, onChange, onReset }: OferteFilte
   const handleChange = (field: keyof FilterValues, value: string) => {
     onChange({ ...values, [field]: value });
   };
+
+  // Buffer local pentru input-ul Client - commit la select/Enter/clear (typing nu declanșează search)
+  const [clientBuffer, setClientBuffer] = useState(values.client);
+  useEffect(() => {
+    setClientBuffer(values.client);
+  }, [values.client]);
 
   const hasFilters = Object.values(values).some(v => v !== '');
 
@@ -135,9 +142,16 @@ export default function OferteFilters({ values, onChange, onReset }: OferteFilte
         <div>
           <label style={{ fontSize: '12px', fontWeight: '600', color: '#7f8c8d', marginBottom: '4px', display: 'block' }}>Client</label>
           <ClientAutocomplete
-            value={values.client}
-            onChange={v => handleChange('client', v)}
-            placeholder="Caută client sau scrie numele..."
+            value={clientBuffer}
+            onChange={v => {
+              setClientBuffer(v);
+              if (v === '' && values.client !== '') {
+                handleChange('client', '');
+              }
+            }}
+            onSelect={v => handleChange('client', v)}
+            onEnter={v => handleChange('client', v)}
+            placeholder="Caută client (Enter pentru filtrare)..."
             inputStyle={{ ...inputStyle, boxSizing: 'border-box' }}
           />
         </div>

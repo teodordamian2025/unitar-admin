@@ -67,7 +67,7 @@ export default function ContractFilters({
       key: 'client',
       label: 'Client',
       type: 'clientAutocomplete',
-      placeholder: 'Caută client sau scrie numele...'
+      placeholder: 'Caută client (Enter pentru filtrare)...'
     },
     {
       key: 'data_creare',

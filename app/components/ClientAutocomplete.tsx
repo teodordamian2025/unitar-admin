@@ -19,6 +19,8 @@ interface ClientItem {
 interface ClientAutocompleteProps {
   value: string;
   onChange: (value: string) => void;
+  onSelect?: (value: string) => void;
+  onEnter?: (value: string) => void;
   placeholder?: string;
   disabled?: boolean;
   inputStyle?: CSSProperties;
@@ -30,6 +32,8 @@ interface ClientAutocompleteProps {
 export default function ClientAutocomplete({
   value,
   onChange,
+  onSelect,
+  onEnter,
   placeholder = 'Caută client...',
   disabled = false,
   inputStyle,
@@ -80,6 +84,7 @@ export default function ClientAutocomplete({
   const handleSelect = (client: ClientItem) => {
     onChange(client.nume);
     setShowSuggestions(false);
+    onSelect?.(client.nume);
   };
 
   return (
@@ -90,6 +95,13 @@ export default function ClientAutocomplete({
         onChange={(e) => {
           onChange(e.target.value);
           setShowSuggestions(true);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            setShowSuggestions(false);
+            onEnter?.(value);
+          }
         }}
         onFocus={(e) => {
           if (value.length > 0) setShowSuggestions(true);

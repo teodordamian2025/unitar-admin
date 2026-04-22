@@ -159,9 +159,8 @@ export default function FacturiList({
   const [searchInput, setSearchInput] = useState(initialSearch);
   const searchDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
-  // State local pentru filtrul Client (debounced separat de filters.client)
+  // State local pentru filtrul Client - commit la select/Enter (nu pe typing)
   const [clientInput, setClientInput] = useState('');
-  const clientDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
   const [showCustomPeriod, setShowCustomPeriod] = useState(false);
   const [customPeriod, setCustomPeriod] = useState({
@@ -219,20 +218,12 @@ export default function FacturiList({
     }
   }, [initialSearch]);
 
-  // Debounce pentru input-ul Client (800ms, la fel ca search)
+  // Commit filtru Client doar la clear (typing nu mai declanșează search în lista mare)
   useEffect(() => {
-    if (clientDebounceRef.current) {
-      clearTimeout(clientDebounceRef.current);
+    if (clientInput === '' && filters.client !== '') {
+      setFilters(prev => ({ ...prev, client: '' }));
     }
-    clientDebounceRef.current = setTimeout(() => {
-      setFilters(prev => ({ ...prev, client: clientInput }));
-    }, 800);
-    return () => {
-      if (clientDebounceRef.current) {
-        clearTimeout(clientDebounceRef.current);
-      }
-    };
-  }, [clientInput]);
+  }, [clientInput, filters.client]);
 
   // Încarcă facturile când se schimbă filtrele (dar nu searchInput direct)
   // ✅ FIX 24.01.2026: Reset la pagina 1 când se schimbă filtrele
@@ -1458,7 +1449,9 @@ export default function FacturiList({
               <ClientAutocomplete
                 value={clientInput}
                 onChange={(v) => setClientInput(v)}
-                placeholder="Caută client sau scrie numele..."
+                onSelect={(v) => setFilters(prev => ({ ...prev, client: v }))}
+                onEnter={(v) => setFilters(prev => ({ ...prev, client: v }))}
+                placeholder="Caută client (Enter pentru filtrare)..."
                 inputStyle={{
                   width: '100%',
                   padding: '0.5rem 0.75rem',
