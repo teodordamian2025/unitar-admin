@@ -362,7 +362,8 @@ export async function POST(request: NextRequest) {
       location: 'EU',
     });
 
-    const totalOreExistente = totalRows[0]?.total_ore || 0;
+    // BigQuery NUMERIC se întoarce ca obiect Big; coerciția cu + concatenează ca string
+    const totalOreExistente = parseFloat(totalRows[0]?.total_ore ?? 0) || 0;
     const totalOreNoi = totalOreExistente + oreLucrateNum;
 
     // Limită flexibilă de 16 ore/zi - PĂSTRAT
