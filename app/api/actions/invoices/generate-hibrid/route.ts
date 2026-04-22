@@ -1044,24 +1044,29 @@ export async function POST(request: NextRequest) {
     );
 
     // ✅ PĂSTRAT: CALCULE TOTALE - FOLOSEȘTE liniile din frontend (fără recalculare)
+    // ✅ FIX BR-CO-10/BR-CO-15 (ANAF e-Factura): rotunjire per linie ÎNAINTE de însumare
+    // pentru ca Σ(valori 2 zecimale) = subtotal și subtotal + TVA = total exact la 2 zecimale
     let subtotal = 0;
     let totalTva = 0;
-    
+
     liniiFacturaActualizate.forEach((linie: any) => {
       const cantitate = Number(linie.cantitate) || 0;
       let pretUnitar = Number(linie.pretUnitar) || 0;
 
       console.log(`💰 PDF Calc - pretUnitar=${pretUnitar} (din frontend)`);
       const cotaTva = Number(linie.cotaTva) || 0;
-      
-      const valoare = cantitate * pretUnitar;
-      const tva = valoare * (cotaTva / 100);
-      
+
+      const valoare = Math.round(cantitate * pretUnitar * 100) / 100;
+      const tva = Math.round(valoare * (cotaTva / 100) * 100) / 100;
+
       subtotal += valoare;
       totalTva += tva;
     });
-    
-    const total = subtotal + totalTva;
+
+    // ✅ Re-rotunjire finală pentru siguranță floating-point
+    subtotal = Math.round(subtotal * 100) / 100;
+    totalTva = Math.round(totalTva * 100) / 100;
+    const total = Math.round((subtotal + totalTva) * 100) / 100;
 
     console.log('💰 TOTALURI din datele frontend (fără recalculare):', {
       subtotal: subtotal.toFixed(2),
@@ -1503,11 +1508,12 @@ export async function POST(request: NextRequest) {
                       const cantitate = Number(linie.cantitate) || 0;
                       const pretUnitar = Number(linie.pretUnitar) || 0;
                       const cotaTva = Number(linie.cotaTva) || 0;
-                      
-                      const valoare = cantitate * pretUnitar;
-                      const tva = valoare * (cotaTva / 100);
-                      const totalLinie = valoare + tva;
-                      
+
+                      // ✅ FIX BR-CO-10: rotunjire per linie pentru consistență cu XML ANAF
+                      const valoare = Math.round(cantitate * pretUnitar * 100) / 100;
+                      const tva = Math.round(valoare * (cotaTva / 100) * 100) / 100;
+                      const totalLinie = Math.round((valoare + tva) * 100) / 100;
+
                       const safeFixed = (num: number) => (Number(num) || 0).toFixed(2);
                       
                       // ✅ PĂSTRAT: FOLOSEȘTE EXCLUSIV datele din frontend (STOP BD lookup)

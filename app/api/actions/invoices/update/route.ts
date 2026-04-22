@@ -927,22 +927,25 @@ function calculateTotalsFromLines(liniiFactura: any[]): {
   
   liniiFactura.forEach(linie => {
     const cantitate = Number(linie.cantitate) || 0;
-    const pretUnitar = typeof linie.pretUnitar === 'string' ? 
+    const pretUnitar = typeof linie.pretUnitar === 'string' ?
       parseFloat(linie.pretUnitar) : Number(linie.pretUnitar) || 0;
     const cotaTva = Number(linie.cotaTva) || 0;
-    
-    const valoare = cantitate * pretUnitar;
-    const tva = valoare * (cotaTva / 100);
-    
+
+    // ✅ FIX BR-CO-10/BR-CO-15 ANAF: rotunjire per linie ÎNAINTE de însumare
+    const valoare = Math.round(cantitate * pretUnitar * 100) / 100;
+    const tva = Math.round(valoare * (cotaTva / 100) * 100) / 100;
+
     subtotal += valoare;
     totalTva += tva;
   });
-  
-  // ✅ Rotunjire la 2 zecimale pentru consistență
+
+  // ✅ Re-rotunjire finală pentru siguranță floating-point
+  const subtotalRounded = Math.round(subtotal * 100) / 100;
+  const totalTvaRounded = Math.round(totalTva * 100) / 100;
   return {
-    subtotal: Math.round(subtotal * 100) / 100,
-    totalTva: Math.round(totalTva * 100) / 100,
-    totalGeneral: Math.round((subtotal + totalTva) * 100) / 100
+    subtotal: subtotalRounded,
+    totalTva: totalTvaRounded,
+    totalGeneral: Math.round((subtotalRounded + totalTvaRounded) * 100) / 100
   };
 }
 

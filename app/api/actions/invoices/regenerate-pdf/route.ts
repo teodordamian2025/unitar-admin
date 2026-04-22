@@ -623,11 +623,12 @@ export async function POST(request: NextRequest) {
                       const cantitate = Number(linie.cantitate) || 0;
                       const pretUnitar = Number(linie.pretUnitar) || 0;
                       const cotaTva = Number(linie.cotaTva) || 0;
-                      
-                      const valoare = cantitate * pretUnitar;
-                      const tva = valoare * (cotaTva / 100);
-                      const totalLinie = valoare + tva;
-                      
+
+                      // ✅ FIX BR-CO-10: rotunjire per linie pentru consistență cu XML ANAF
+                      const valoare = Math.round(cantitate * pretUnitar * 100) / 100;
+                      const tva = Math.round(valoare * (cotaTva / 100) * 100) / 100;
+                      const totalLinie = Math.round((valoare + tva) * 100) / 100;
+
                       const safeFixed = (num: number) => (Number(num) || 0).toFixed(2);
                       
                       let descriereCompleta = cleanNonAscii(linie.denumire || 'N/A');

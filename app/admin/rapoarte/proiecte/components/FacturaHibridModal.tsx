@@ -1578,19 +1578,26 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
       }
 
       const cotaTva = Number(linie.cotaTva) || 0;
-      const valoare = cantitate * pretUnitar;
-      const tva = valoare * (cotaTva / 100);
+      // ✅ FIX BR-CO-10/BR-CO-15: rotunjire per linie ÎNAINTE de însumare
+      // pentru ca Σ(valori 2 zecimale) = subtotal 2 zecimale și total = subtotal + TVA exact
+      const valoare = Math.round(cantitate * pretUnitar * 100) / 100;
+      const tva = Math.round(valoare * (cotaTva / 100) * 100) / 100;
 
       subtotal += valoare;
       totalTva += tva;
     });
+
+    // ✅ Re-rotunjire pentru siguranță floating-point la însumare
+    subtotal = Math.round(subtotal * 100) / 100;
+    totalTva = Math.round(totalTva * 100) / 100;
+    const totalGeneral = Math.round((subtotal + totalTva) * 100) / 100;
 
     const safeFixed = (num: number) => (Number(num) || 0).toFixed(2);
 
     return {
       subtotal: safeFixed(subtotal),
       totalTva: safeFixed(totalTva),
-      totalGeneral: safeFixed(subtotal + totalTva)
+      totalGeneral: safeFixed(totalGeneral)
     };
   };
 
@@ -2962,10 +2969,11 @@ export default function FacturaHibridModal({ proiect, onClose, onSuccess }: Fact
                     }
 
                     const cotaTva = Number(linie.cotaTva) || 0;
-                    const valoare = cantitate * pretUnitar;
-                    const tva = valoare * (cotaTva / 100);
-                    const total = valoare + tva;
-                    
+                    // ✅ FIX BR-CO-10: rotunjire per linie pentru consistență cu XML ANAF
+                    const valoare = Math.round(cantitate * pretUnitar * 100) / 100;
+                    const tva = Math.round(valoare * (cotaTva / 100) * 100) / 100;
+                    const total = Math.round((valoare + tva) * 100) / 100;
+
                     const safeFixed = (num: number) => (Number(num) || 0).toFixed(2);
                     
                     return (

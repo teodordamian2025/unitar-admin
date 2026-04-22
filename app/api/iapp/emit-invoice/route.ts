@@ -184,15 +184,24 @@ export async function POST(request: NextRequest) {
       console.log('✅ [iapp.ro] Line items găsite:', linii.length);
       console.log('🔍 [iapp.ro] date_complete_json keys:', Object.keys(dateComplete));
 
-      itemsRows = linii.map((linie: any) => ({
-        title: linie.denumire || linie.Denumire_Etapa || 'Serviciu',
-        descriere: linie.descriere || linie.Descriere || '',
-        um: 'buc',
-        cantitate: 1,
-        pret: linie.valoare_ron || linie.Valoare_RON || linie.pretUnitar || 0,
-        tvapercent: linie.cota_tva || linie.cotaTva || 19,
-        tvavalue: ((linie.valoare_ron || linie.Valoare_RON || linie.pretUnitar || 0) * (linie.cota_tva || linie.cotaTva || 19) / 100)
-      }));
+      // ✅ FIX BR-CO-10/BR-CO-15 ANAF: rotunjire per linie înainte de trimitere la iapp.ro
+      // astfel încât Σ(pret + tvavalue) per linie = total factura la 2 zecimale
+      itemsRows = linii.map((linie: any) => {
+        const pretRaw = linie.valoare_ron || linie.Valoare_RON || linie.pretUnitar || 0;
+        const tvapercent = linie.cota_tva || linie.cotaTva || 19;
+        const pretRounded = Math.round(pretRaw * 100) / 100;
+        const tvavalueRounded = Math.round(pretRounded * (tvapercent / 100) * 100) / 100;
+
+        return {
+          title: linie.denumire || linie.Denumire_Etapa || 'Serviciu',
+          descriere: linie.descriere || linie.Descriere || '',
+          um: 'buc',
+          cantitate: 1,
+          pret: pretRounded,
+          tvapercent,
+          tvavalue: tvavalueRounded
+        };
+      });
 
       console.log('✅ [iapp.ro] Items procesate pentru iapp.ro:', JSON.stringify(itemsRows, null, 2));
     } catch (parseError) {
@@ -200,14 +209,17 @@ export async function POST(request: NextRequest) {
       // Fallback: creează un item generic
       const total = factura.total || factura.Valoare_Totala || 0;
       const subtotal = factura.subtotal || (total / 1.19) || 0;
+      // ✅ FIX BR-CO-10 ANAF: rotunjire explicită pentru consistență cu XML
+      const pretRounded = Math.round(Number(subtotal) * 100) / 100;
+      const tvavalueRounded = Math.round((Number(total) - Number(subtotal)) * 100) / 100;
       itemsRows = [{
         title: 'Servicii ' + client_nume,
         descriere: 'Factură generată automat',
         um: 'buc',
         cantitate: 1,
-        pret: subtotal,
+        pret: pretRounded,
         tvapercent: 19,
-        tvavalue: total - subtotal
+        tvavalue: tvavalueRounded
       }];
       console.log('⚠️ [iapp.ro] Folosit item fallback:', itemsRows[0]);
     }

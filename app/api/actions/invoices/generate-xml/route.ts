@@ -388,18 +388,27 @@ export async function generateUBLXml(facturaData: any) {
     const paymentTerms = doc.ele('cac:PaymentTerms');
     paymentTerms.ele('cbc:Note').txt('Plata în 30 de zile de la data facturii');
 
+    // ✅ FIX BR-CO-10/BR-CO-15: rotunjire per linie pentru ca Σ(valori 2 zecimale) = subtotal
+    // Recalculăm totalurile aici din liniile rotunjite (nu folosim facturaData.subtotal/total
+    // direct, pentru compat cu facturi vechi salvate înainte de fix).
+    let xmlSubtotal = 0;
+    let xmlTotalTva = 0;
+
     // Liniile facturii
     liniiFactura.forEach((linie: any, index: number) => {
       const invoiceLine = doc.ele('cac:InvoiceLine');
       invoiceLine.ele('cbc:ID').txt((index + 1).toString());
-      
+
       const cantitate = Number(linie.cantitate) || 1;
       const pretUnitar = Number(linie.pretUnitar) || 0;
       const cotaTva = Number(linie.cotaTva) || 19;
-      
-      const valoareFaraTva = cantitate * pretUnitar;
-      const valoareTva = valoareFaraTva * (cotaTva / 100);
-      
+
+      const valoareFaraTva = Math.round(cantitate * pretUnitar * 100) / 100;
+      const valoareTva = Math.round(valoareFaraTva * (cotaTva / 100) * 100) / 100;
+
+      xmlSubtotal += valoareFaraTva;
+      xmlTotalTva += valoareTva;
+
       invoiceLine.ele('cbc:InvoicedQuantity', { unitCode: 'H87' }).txt(cantitate.toString());
       invoiceLine.ele('cbc:LineExtensionAmount', { currencyID: 'RON' })
         .txt(valoareFaraTva.toFixed(2));
@@ -424,27 +433,41 @@ export async function generateUBLXml(facturaData: any) {
       price.ele('cbc:PriceAmount', { currencyID: 'RON' }).txt(pretUnitar.toFixed(2));
     });
 
+    // ✅ Re-rotunjire finală pentru siguranță floating-point la însumare
+    xmlSubtotal = Math.round(xmlSubtotal * 100) / 100;
+    xmlTotalTva = Math.round(xmlTotalTva * 100) / 100;
+    const xmlTotal = Math.round((xmlSubtotal + xmlTotalTva) * 100) / 100;
+
+    console.log('💰 XML totaluri recalculate din linii rotunjite:', {
+      subtotal: xmlSubtotal.toFixed(2),
+      totalTva: xmlTotalTva.toFixed(2),
+      total: xmlTotal.toFixed(2),
+      facturaData_subtotal: facturaData.subtotal,
+      facturaData_total: facturaData.total,
+      facturaData_total_tva: facturaData.total_tva
+    });
+
     // Totaluri
     const legalMonetaryTotal = doc.ele('cac:LegalMonetaryTotal');
     legalMonetaryTotal.ele('cbc:LineExtensionAmount', { currencyID: 'RON' })
-      .txt(facturaData.subtotal.toFixed(2));
+      .txt(xmlSubtotal.toFixed(2));
     legalMonetaryTotal.ele('cbc:TaxExclusiveAmount', { currencyID: 'RON' })
-      .txt(facturaData.subtotal.toFixed(2));
+      .txt(xmlSubtotal.toFixed(2));
     legalMonetaryTotal.ele('cbc:TaxInclusiveAmount', { currencyID: 'RON' })
-      .txt(facturaData.total.toFixed(2));
+      .txt(xmlTotal.toFixed(2));
     legalMonetaryTotal.ele('cbc:PayableAmount', { currencyID: 'RON' })
-      .txt(facturaData.total.toFixed(2));
+      .txt(xmlTotal.toFixed(2));
 
     // TVA Summary
     const taxTotal = doc.ele('cac:TaxTotal');
     taxTotal.ele('cbc:TaxAmount', { currencyID: 'RON' })
-      .txt(facturaData.total_tva.toFixed(2));
+      .txt(xmlTotalTva.toFixed(2));
 
     const taxSubtotal = taxTotal.ele('cac:TaxSubtotal');
     taxSubtotal.ele('cbc:TaxableAmount', { currencyID: 'RON' })
-      .txt(facturaData.subtotal.toFixed(2));
+      .txt(xmlSubtotal.toFixed(2));
     taxSubtotal.ele('cbc:TaxAmount', { currencyID: 'RON' })
-      .txt(facturaData.total_tva.toFixed(2));
+      .txt(xmlTotalTva.toFixed(2));
 
     const taxCategory = taxSubtotal.ele('cac:TaxCategory');
     taxCategory.ele('cbc:ID').txt('S');
