@@ -9,10 +9,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 import { sendEmail, wrapEmailHTML, isValidEmail } from '@/lib/notifications/send-email';
+import { launchBrowser } from '@/lib/puppeteer-helper';
 import JSZip from 'jszip';
 import { readFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
+
+export const runtime = 'nodejs';
+export const maxDuration = 60;
 
 const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
 const DATASET = 'PanouControlUnitar';
@@ -70,8 +74,6 @@ async function generateDocxBuffer(oferta: any): Promise<Buffer | null> {
 // Generate PDF buffer using Puppeteer
 async function generatePdfBuffer(oferta: any): Promise<Buffer | null> {
   try {
-    const puppeteer = await import('puppeteer');
-
     const valoare = typeof oferta.valoare === 'object' && oferta.valoare && 'value' in oferta.valoare
       ? parseFloat(oferta.valoare.value)
       : parseFloat(oferta.valoare) || 0;
@@ -200,10 +202,7 @@ async function generatePdfBuffer(oferta: any): Promise<Buffer | null> {
 
     let browser;
     try {
-      browser = await puppeteer.default.launch({
-        headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
-      });
+      browser = await launchBrowser();
       const page = await browser.newPage();
       await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
       const pdfBuffer = await page.pdf({

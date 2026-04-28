@@ -145,11 +145,11 @@ const nextConfig = {
   swcMinify: true,
   experimental: {
     serverActions: true,
-    serverComponentsExternalPackages: ['pdf-parse', 'puppeteer']
+    serverComponentsExternalPackages: ['pdf-parse', 'puppeteer', 'puppeteer-core', '@sparticuz/chromium']
   },
   webpack: (config, { isServer }) => {
     if (isServer) {
-      config.externals.push('supports-color', 'puppeteer');
+      config.externals.push('supports-color', 'puppeteer', 'puppeteer-core', '@sparticuz/chromium');
     }
     return config;
   },

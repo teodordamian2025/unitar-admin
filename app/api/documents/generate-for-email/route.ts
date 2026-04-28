@@ -8,7 +8,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 import JSZip from 'jszip';
-import puppeteer from 'puppeteer';
+import { launchBrowser } from '@/lib/puppeteer-helper';
+
+export const runtime = 'nodejs';
+export const maxDuration = 60;
 
 const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT_ID || 'hale-mode-464009-i6';
 const DATASET = 'PanouControlUnitar';
@@ -283,10 +286,7 @@ async function generateFacturaPDF(facturaId: string): Promise<{ buffer: Buffer; 
   // Generează PDF cu Puppeteer
   let browser;
   try {
-    browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
-    });
+    browser = await launchBrowser();
 
     const page = await browser.newPage();
     await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
