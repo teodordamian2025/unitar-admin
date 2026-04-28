@@ -65,8 +65,9 @@ async function syncInvoiceCounter(serie: string) {
     console.log(`🔄 [SYNC-COUNTER] Sincronizez numar_curent_facturi pentru seria: ${serie}`);
 
     // 1. Găsește MAX(numar) din FacturiGenerate pentru seria respectivă
+    // SAFE_CAST: ignoră facturile vechi cu numere non-numerice (ex: "F331/27.06.2024")
     const maxQuery = `
-      SELECT MAX(CAST(numar AS INT64)) as max_numar
+      SELECT MAX(SAFE_CAST(numar AS INT64)) as max_numar
       FROM ${TABLE_FACTURI_GENERATE}
       WHERE serie = @serie
     `;

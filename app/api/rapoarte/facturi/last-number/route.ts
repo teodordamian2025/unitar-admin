@@ -29,13 +29,15 @@ export async function POST(request: NextRequest) {
 
     // ✅ FIX: BigQuery salvează serie în coloana separată "serie" și doar numărul în "numar"
     // Exemplu: serie="UPA", numar="1001" (NU "UPA-1001")
+    // SAFE_CAST: ignoră facturile vechi cu numere non-numerice (ex: "F331/27.06.2024")
     const query = `
       SELECT
         numar,
-        CAST(numar AS INT64) as numar_extras
+        SAFE_CAST(numar AS INT64) as numar_extras
       FROM ${TABLE_FACTURI_GENERATE}
       WHERE serie = @serie
-      ORDER BY CAST(numar AS INT64) DESC NULLS LAST
+        AND SAFE_CAST(numar AS INT64) IS NOT NULL
+      ORDER BY SAFE_CAST(numar AS INT64) DESC NULLS LAST
       LIMIT 1
     `;
 
