@@ -63,6 +63,19 @@
   ],
   "shortcuts": [
     {
+      "name": "UNITAR Mobil",
+      "short_name": "Mobil",
+      "description": "Versiunea mobilă a panoului admin",
+      "url": "/admin/mobil",
+      "icons": [
+        {
+          "src": "/icons/shortcut-dashboard.svg",
+          "sizes": "192x192",
+          "type": "image/svg+xml"
+        }
+      ]
+    },
+    {
       "name": "Dashboard",
       "short_name": "Dashboard",
       "description": "Accesează dashboard-ul executiv",

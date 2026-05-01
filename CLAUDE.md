@@ -1102,3 +1102,190 @@ UNITAR_CUI=35639210
 ✅ TypeScript types complete + error handling
 
 **ULTIMA ACTUALIZARE**: 08.10.2025 - Implementare completă production-ready
+
+---
+
+## 📱 SECȚIUNE MOBILĂ ADMIN — `/admin/mobil` (start: 01.05.2026)
+
+**STATUS**: ✅ COMPLET — Toate Fazele 0-5 implementate. Modulele: dashboard, proiecte, clienți+ANAF, email, financiar, oferte (CRUD complet), facturi (read+PDF), contracte (read+detalii). De testat cu utilizatori reali înainte deploy production.
+**OBIECTIV**: Pagină admin dedicată mobilului (PWA), refolosește toate API-urile existente, ZERO impact pe desktop. Restul aplicației rămâne neatinsă.
+**DECIZIE ARHITECTURALĂ**: Mobile-friendly route în aceeași Next.js app (NU app nativ). Motivare: PWA deja configurat (next-pwa, manifest.json), aceeași autentificare Firebase, aceleași API-uri, zero codebase dublu.
+
+### **DE CE `/admin/mobil` ȘI NU `/mobil`**
+
+- Moștenește `ProtectedRoute` din `app/admin/layout.tsx` → autentificare gratis.
+- `RealtimeProvider` deja injectat la nivel de admin layout.
+- `ModernLayout` (sidebar + chatbot + timer persistent) este invocat de fiecare pagină admin individual, NU de layout — deci `/admin/mobil/*` poate folosi un layout complet diferit fără să forțeze nimic.
+
+### **REGULĂ CRITICĂ — NU REUTILIZA MODALELE MARI**
+
+Următoarele componente sunt construite pentru desktop și NU trebuie reutilizate pe mobil. Forțarea lor pe 375px rupe layout-ul. Componente mobile noi, slim, care fac aceleași `fetch()` la aceleași endpoint-uri:
+- `FacturaHibridModal.tsx` — **3604 linii** ❌
+- `ContractModal.tsx` — **3196 linii** ❌
+- `ProiecteTable.tsx` — **2852 linii** ❌
+- `ProiectNouModal.tsx` — **2244 linii** ❌
+- `SendEmailClientModal.tsx` — **1343 linii** ❌
+
+**Excepții reutilizabile direct (cu mici tweak-uri CSS):**
+- `ANAFClientSearch.tsx` ✅
+- `CommentsCard.tsx` (515 linii) ✅
+- `NotificationBell.tsx` ✅
+- `components/Chatbot.tsx` (468 linii — folosit ca FAB în colț) ✅
+
+### **PLAN PE FAZE**
+
+#### **Faza 0 — Detection + redirect (1 zi) [✅ COMPLET]**
+Userul de pe mobil ajunge automat la `/admin/mobil` post-login. Userul de pe desktop rămâne pe `/admin`.
+
+**Fișiere noi:**
+- `app/lib/isMobileDevice.ts` — helper UA + width (<768px).
+- `app/admin/mobil/layout.tsx` — layout minimal (NU folosește ModernLayout).
+- `app/admin/mobil/page.tsx` — placeholder "în construcție".
+
+**Modificări minime existent (3 locuri):**
+1. `app/login/page.tsx:71` — redirect condiționat: `isMobile() ? '/admin/mobil' : '/admin'`.
+2. `app/admin/page.tsx` — `useEffect` care `router.replace('/admin/mobil')` dacă `isMobile()`.
+3. `public/manifest.json` — shortcut nou "UNITAR Mobil" → `/admin/mobil`.
+
+**Risc desktop:** 0 — `isMobile()` returnează false pe desktop.
+
+#### **Faza 1 — Shell + dashboard (2 zile) [✅ COMPLET]**
+Layout mobil + dashboard cu KPI și grafic lunar.
+
+**Fișiere noi create:**
+```
+app/admin/mobil/
+├── layout.tsx              ✅ Shell: BottomNav + ChatbotFAB; padding bottom pt nav
+├── page.tsx                ✅ Dashboard: KPI grid 2x2 + DashboardChart
+└── components/
+    ├── MobileTopBar.tsx    ✅ Titlu + back + NotificationBell (dynamic import)
+    ├── MobileBottomNav.tsx ✅ 5 taburi: Acasă / Proiecte / Clienți / Financiar / Mai mult
+    ├── MobileChatbotFAB.tsx✅ Wrapper Chatbot cu fabBottomOffset = 80px (deasupra nav)
+    ├── KPICard.tsx         ✅ Card KPI cu icon + valoare + meta + accent colors
+    └── DashboardChart.tsx  ✅ Recharts BarChart 12 luni stacked
+app/api/rapoarte/
+└── cashflow-monthly/       ✅ Endpoint nou: încasări/plăți/facturi emise pe lună (12 luni)
+```
+
+**Modificări la cod existent:**
+- `components/Chatbot.tsx` — adăugat 2 props OPȚIONALE `fabBottomOffset` și `fabRightOffset` (default = comportament neschimbat). Folosite de MobileChatbotFAB pentru a evita suprapunerea cu BottomNav.
+
+**API nou (zero impact pe alte endpoint-uri):**
+- `GET /api/rapoarte/cashflow-monthly` → array 12 luni cu `{year_month, facturi_emise, incasari, plati}` în RON. Folosește `FacturiGenerate_v2` (data_factura) și `TranzactiiBancare_v2` (directie='intrare'/'iesire'). Calendar CTE pentru luni fără date.
+
+#### **Faza 2 — Proiecte: listă + detalii (2-3 zile) [✅ COMPLET]**
+```
+app/admin/mobil/lib/format.ts                       ✅ Helpers BQ DATE + money
+app/admin/mobil/proiecte/page.tsx                   ✅ Listă paginată + search + filter chips
+app/admin/mobil/proiecte/components/
+  ├── ProiectCard.tsx                               ✅ Card cu status badge, client, valoare, deadline
+  └── ProiectSearchBar.tsx                          ✅ Sticky search + status chips
+app/admin/mobil/proiecte/[id]/page.tsx              ✅ Detalii proiect cu taburi + FAB acțiuni
+app/admin/mobil/proiecte/[id]/components/
+  ├── ProiectDetailTabs.tsx                         ✅ Tabs sticky: Info | Etape | Facturi | Contracte | Comentarii
+  ├── ActiuniSheet.tsx                              ✅ Bottom sheet acțiuni (placeholder Faze 3-5)
+  └── tabs/
+      ├── InfoTab.tsx                               ✅ General/Client/Valori/Status workflow/Descriere/Observații
+      ├── EtapeTab.tsx                              ✅ Lista subproiecte (fetch /api/rapoarte/subproiecte)
+      ├── FacturiTab.tsx                            ✅ Facturi (din proiect.contracte[*].facturi_contract + facturi_directe)
+      ├── ContracteTab.tsx                          ✅ Contracte + anexe (din proiect.contracte)
+      └── ComentariiTab.tsx                         ✅ Listă + compose cu optimistic update
+```
+**Endpoint-uri folosite (toate existente, nimic modificat):** `/api/rapoarte/proiecte`, `/api/rapoarte/subproiecte`, `/api/rapoarte/comentarii` (GET + POST).
+**Detail fetch:** folosește `/api/rapoarte/proiecte?search=ID&limit=20` și filtrează exact match — endpoint-ul agregă deja contractele și facturile prin CTE-uri.
+**FAB acțiuni:** poziționat la stânga FAB-ului Chatbot (right: 16+56+12px), deschide ActiuniSheet — toate acțiunile sunt disabled în Faza 2 (urmează în Faze 3-5).
+
+#### **Faza 3 — Clienți + ANAF + Proiect nou (2-3 zile) [✅ COMPLET]**
+```
+app/admin/mobil/clienti/page.tsx                    ✅ Listă + search + buton "Client nou"
+app/admin/mobil/clienti/components/ClientCard.tsx   ✅ Card cu nume, CUI, oraș, contact
+app/admin/mobil/clienti/nou/page.tsx                ✅ Form cu ANAF lookup + POST /api/rapoarte/clienti
+app/admin/mobil/proiecte/nou/page.tsx               ✅ Wizard 3 pași (Info / Client / Valoare+Deadline)
+                                                       — Step 2 face fetch clienți + link "+ Client nou"
+                                                       — Suport ?clientId&clientNume pentru flow client→proiect
+app/admin/mobil/proiecte/page.tsx                   ✅ FAB "+" adăugat pentru proiect nou
+```
+**Endpoint-uri folosite (toate existente):** `/api/rapoarte/clienti` (GET+POST), `/api/anaf/company-info`, `/api/rapoarte/proiecte` (POST).
+**NOTĂ:** NU am reutilizat `ANAFClientSearch.tsx` (511 linii cu DOM-toast desktop). În loc, slim form mobile-first care apelează direct `/api/anaf/company-info`.
+**Flow integrat:** În wizard proiect step 2, buton "+ Client nou" → trimite `?return=/admin/mobil/proiecte/nou` → după salvare client, redirect cu `?clientId&clientNume` → wizard pre-selectează clientul nou și trece la step 2.
+
+#### **Faza 4 — Acțiuni rapide (2 zile) [✅ COMPLET]**
+```
+app/admin/mobil/proiecte/[id]/trimite-email/page.tsx  ✅ Slim form email + sugestii din contacte
+app/admin/mobil/financiar/page.tsx                    ✅ Grafic stacked 12 luni + StatCards + listă tranzacții
+app/admin/mobil/financiar/components/
+  ├── FinanciarChart.tsx                              ✅ ComposedChart: bare incasari/plati/facturi + linie net
+  └── TranzactieCard.tsx                              ✅ Card cu directie (↑↓), suma signed, contrapartidă, categorie
+app/admin/mobil/proiecte/[id]/components/ActiuniSheet.tsx ✅ Email + Comentariu activate (Faza 5: contract/factură/PV)
+```
+**Endpoint-uri folosite (toate existente):**
+- `/api/client-email/send` (POST) — pentru trimite email
+- `/api/rapoarte/clienti/contacte` (GET) — sugestii destinatari
+- `/api/tranzactii/dashboard?data=all` (GET) — listă tranzacții + stats agregate
+- `/api/rapoarte/cashflow-monthly` (GET) — grafic (creat în Faza 1, reutilizat aici)
+**NOTĂ:** NU am reutilizat `SendEmailClientModal.tsx` (1343 linii cu templates desktop, atașamente, generare documente).
+       Slim form mobile-first care apelează același endpoint `/api/client-email/send`.
+**Comentariul:** deja activ din Faza 2 prin tabul "Comentarii". ActiuniSheet doar comută la acel tab.
+
+#### **Faza 5 — Oferte/Facturi/Contracte (3-5 zile) [✅ COMPLET]**
+
+**Strategie aplicată:** Pentru oferte (creare frecventă, valori mici de date) → CRUD complet mobil. Pentru facturi/contracte (logică complexă desktop, multi-currency, ANAF, template DOCX) → READ-ONLY mobil + buton "Deschide pe desktop".
+
+**5a — Oferte (CRUD complet mobil):**
+```
+app/admin/mobil/oferte/
+├── page.tsx                              ✅ Listă + KPI (în_așteptare/acceptate) + search + filter status
+├── components/OfertaCard.tsx             ✅ Card cu status + valoare + expirare
+├── nou/page.tsx                          ✅ Form fast-path: client search + denumire + valoare + expirare
+├── [id]/page.tsx                         ✅ Detalii + acțiuni status (7 statuses) + descărcare PDF
+└── [id]/trimite-email/page.tsx           ✅ Email cu attach PDF + template default
+```
+**Endpoint-uri folosite:** `/api/rapoarte/oferte` (GET+POST), `/api/rapoarte/oferte/status` (PUT), `/api/rapoarte/oferte/send-email` (POST), `/api/actions/oferte/generate-pdf` (POST → blob). Toate existente.
+
+**5b — Facturi (read-only + PDF):**
+```
+app/admin/mobil/facturi/
+├── page.tsx                              ✅ Listă cu search + paginare offset + flag "scadență depășită"
+├── components/FacturaCard.tsx            ✅ Card cu status, valoare, scadență highlight roșu pe overdue
+└── [id]/page.tsx                         ✅ Detalii + descărcare PDF + link spre proiect
+```
+**Endpoint-uri folosite:** `/api/actions/invoices/list`, `/api/actions/invoices/download-pdf?fileName=...`. Crearea facturilor noi → desktop.
+
+**5c — Contracte (read-only):**
+```
+app/admin/mobil/contracte/
+├── page.tsx                              ✅ Listă cu search + paginare offset
+├── components/ContractCard.tsx           ✅ Card cu status, valoare, dată semnare
+└── [id]/page.tsx                         ✅ Detalii cu etape + anexe + link spre proiect
+```
+**Endpoint folosit:** `/api/rapoarte/contracte` (GET cu search). Generare contracte noi → desktop (template DOCX complex).
+
+**5 final — Pagina "Mai mult":**
+```
+app/admin/mobil/mai-mult/page.tsx         ✅ Hub link-uri: Oferte / Facturi / Contracte / Notificări / Desktop / Logout
+```
+Activează tabul "Mai mult" din `MobileBottomNav` care era pasiv.
+
+**REGULĂ APLICATĂ:** NU am reutilizat `OfertaModal.tsx`, `ContractModal.tsx` (3196 linii), `FacturaHibridModal.tsx` (3604 linii). Slim mobile components care apelează aceleași endpoint-uri.
+
+### **MODIFICĂRI MINIME ÎN COD EXISTENT (rezumat)**
+
+| Fișier | Modificare |
+|---|---|
+| `app/login/page.tsx:71` | `window.location.href` condiționat de `isMobile()` |
+| `app/admin/page.tsx` | `useEffect` cu `router.replace` pe mobil |
+| `public/manifest.json` | shortcut nou "UNITAR Mobil" → `/admin/mobil` |
+
+**Rest neatins:** Toate `*Modal.tsx`, `*Table.tsx` din `app/admin/rapoarte/proiecte/components/` rămân la fel.
+
+### **TEST PLAN GENERAL**
+
+1. **Localhost:** `npm run dev`, Chrome DevTools → iPhone SE (375px).
+2. **Real device:** ngrok / Vercel preview → instalare PWA pe telefon.
+3. **Regresii desktop:** după fiecare fază, verifică `/admin`, `/admin/rapoarte/proiecte` cu desktop viewport — identic cu înainte.
+4. **Auth flow:** login mobil → `/admin/mobil`, login desktop → `/admin`. Logout → `/login`.
+
+### **ESTIMARE**
+
+- **v1 (Faze 0-4):** 7-11 zile cu testare.
+- **v2 (Faza 5):** +3-5 zile.

@@ -5,6 +5,7 @@
 import { useState, useEffect } from 'react';
 import { signInWithEmailAndPassword, browserLocalPersistence, browserSessionPersistence, setPersistence } from 'firebase/auth';
 import { auth } from '@/lib/firebaseConfig';
+import { isMobileDevice } from '@/app/lib/isMobileDevice';
 import Script from 'next/script';
 
 declare global {
@@ -66,7 +67,7 @@ export default function LoginPage() {
       await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
       await signInWithEmailAndPassword(auth, email, password);
 
-      window.location.href = '/admin';
+      window.location.href = isMobileDevice() ? '/admin/mobil' : '/admin';
     } catch (err: any) {
       setError(`Autentificare eșuată: ${err.message}`);
     }

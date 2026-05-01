@@ -13,9 +13,19 @@ interface ChatbotProps {
   userId?: string;
   userRole?: string;
   userName?: string;
+  /** Offset bottom (px) pentru butonul FAB când chatbotul e închis. Util când există un bottom-nav fix care s-ar suprapune. */
+  fabBottomOffset?: number;
+  /** Offset right (px) pentru butonul FAB. */
+  fabRightOffset?: number;
 }
 
-export default function Chatbot({ userId = 'admin', userRole = 'admin', userName = 'Admin' }: ChatbotProps) {
+export default function Chatbot({
+  userId = 'admin',
+  userRole = 'admin',
+  userName = 'Admin',
+  fabBottomOffset,
+  fabRightOffset,
+}: ChatbotProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -219,8 +229,8 @@ export default function Chatbot({ userId = 'admin', userRole = 'admin', userName
         onClick={() => setIsOpen(true)}
         style={{
           position: 'fixed',
-          bottom: isMobile ? '24px' : '20px',
-          right: isMobile ? '24px' : '20px',
+          bottom: fabBottomOffset != null ? `${fabBottomOffset}px` : (isMobile ? '24px' : '20px'),
+          right: fabRightOffset != null ? `${fabRightOffset}px` : (isMobile ? '24px' : '20px'),
           height: isMobile ? '56px' : '56px',
           borderRadius: isMobile ? '28px' : '50%',
           padding: isMobile ? '0 20px 0 16px' : '0',

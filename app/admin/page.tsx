@@ -15,6 +15,7 @@ import { useRouter } from 'next/navigation';
 import ModernLayout from '@/app/components/ModernLayout';
 import { LiveMetrics, LiveNotifications, RealtimeProvider } from '@/app/components/realtime';
 import { toast } from 'react-toastify';
+import { isMobileDevice } from '@/app/lib/isMobileDevice';
 
 interface KPIData {
   cashFlow: {
@@ -68,6 +69,14 @@ export default function AdminPage() {
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   const [isRefreshingBalance, setIsRefreshingBalance] = useState(false);
+  const [redirectingToMobile, setRedirectingToMobile] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && isMobileDevice()) {
+      setRedirectingToMobile(true);
+      router.replace('/admin/mobil');
+    }
+  }, [router]);
 
   useEffect(() => {
     if (loading) return;
@@ -75,8 +84,9 @@ export default function AdminPage() {
       router.push('/login');
       return;
     }
+    if (redirectingToMobile) return;
     checkUserRole();
-  }, [user, loading, router]);
+  }, [user, loading, router, redirectingToMobile]);
 
   useEffect(() => {
     if (isAuthorized) {
@@ -333,6 +343,8 @@ export default function AdminPage() {
       default: return '📢';
     }
   };
+
+  if (redirectingToMobile) return null;
 
   if (loading || !isAuthorized) {
     return (
