@@ -288,6 +288,10 @@ async function getTransactionsList(filters: FilterParams): Promise<{
     `;
 
     // Query pentru date
+    // FIX 01.05.2026: deduplicare matching - o tranzacție poate avea mai multe rânduri
+    // status='active' în TranzactiiMatching_v2 (split matching pe mai multe facturi),
+    // iar LEFT JOIN direct dubla rândurile în listă. Păstrăm doar cel mai bun match
+    // (confidence_score DESC, apoi data_creare DESC) per tranzacție.
     const dataQuery = `
       SELECT
         t.id,
@@ -302,15 +306,27 @@ async function getTransactionsList(filters: FilterParams): Promise<{
         t.matching_tip,
         t.matching_confidence,
 
-        -- Matching details din join
+        -- Matching details din join (best match per tranzacție)
         m.target_type as matched_target_type,
         m.target_id as matched_target_id,
         m.confidence_score as matched_confidence,
         m.matching_details as matched_details
 
       FROM ${TABLE_TRANZACTII_BANCARE} t
-      LEFT JOIN ${TABLE_TRANZACTII_MATCHING} m
-        ON t.id = m.tranzactie_id AND m.status = 'active'
+      LEFT JOIN (
+        SELECT
+          tranzactie_id,
+          target_type,
+          target_id,
+          confidence_score,
+          matching_details
+        FROM ${TABLE_TRANZACTII_MATCHING}
+        WHERE status = 'active'
+        QUALIFY ROW_NUMBER() OVER (
+          PARTITION BY tranzactie_id
+          ORDER BY confidence_score DESC, data_creare DESC
+        ) = 1
+      ) m ON t.id = m.tranzactie_id
       ${whereClause}
       ${orderClause}
       LIMIT ${limit} OFFSET ${offset}
