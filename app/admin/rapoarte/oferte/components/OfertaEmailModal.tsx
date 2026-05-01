@@ -87,13 +87,17 @@ export default function OfertaEmailModal({ isOpen, onClose, onSuccess, oferta, u
   const [destinatari, setDestinatari] = useState(oferta.client_email || '');
   const [attachDocx, setAttachDocx] = useState(false);
   const [attachPdf, setAttachPdf] = useState(true);
+  const [attachPdfComplet, setAttachPdfComplet] = useState(false);
   const [fromAddress, setFromAddress] = useState('');
   const [sending, setSending] = useState(false);
   const [manualAttachments, setManualAttachments] = useState<ManualAttachment[]>([]);
+  const [manualFiles, setManualFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB per file
-  const MAX_TOTAL_SIZE = 25 * 1024 * 1024; // 25MB total
+  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB per file individual
+  // Vercel limita request body la ~4.5MB. Folosim multipart (fara base64) pentru a maximiza spatiul,
+  // dar pastram limita totala sub 4MB pentru a lasa loc subiectului/continutului email-ului.
+  const MAX_TOTAL_SIZE = 4 * 1024 * 1024; // 4MB total (sigur sub limita Vercel)
 
   useEffect(() => {
     const defaults = getDefaultContent(tipEmail, oferta);
@@ -101,24 +105,14 @@ export default function OfertaEmailModal({ isOpen, onClose, onSuccess, oferta, u
     setContinut(defaults.continut);
   }, [tipEmail]);
 
-  const fileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => {
-        const result = reader.result as string;
-        const base64 = result.split(',')[1];
-        resolve(base64);
-      };
-      reader.onerror = error => reject(error);
-    });
-  };
-
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
 
-    const currentTotalSize = manualAttachments.reduce((sum, att) => sum + att.size, 0);
+    let currentTotalSize = manualFiles.reduce((sum, f) => sum + f.size, 0);
+
+    const newFiles: File[] = [];
+    const newMeta: ManualAttachment[] = [];
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
@@ -129,26 +123,28 @@ export default function OfertaEmailModal({ isOpen, onClose, onSuccess, oferta, u
       }
 
       if (currentTotalSize + file.size > MAX_TOTAL_SIZE) {
-        showToast('Dimensiunea totala a atasamentelor depaseste 25MB', 'error');
+        showToast(`Dimensiunea totala a atasamentelor depaseste ${(MAX_TOTAL_SIZE / 1024 / 1024).toFixed(0)}MB (limita Vercel)`, 'error');
         break;
       }
 
-      if (manualAttachments.some(att => att.name === file.name)) {
+      if (manualFiles.some(f => f.name === file.name)) {
         showToast(`Fisierul "${file.name}" exista deja`, 'error');
         continue;
       }
 
-      try {
-        const base64 = await fileToBase64(file);
-        setManualAttachments(prev => [...prev, {
-          name: file.name,
-          size: file.size,
-          type: file.type,
-          content: base64
-        }]);
-      } catch {
-        showToast(`Eroare la incarcarea fisierului "${file.name}"`, 'error');
-      }
+      newFiles.push(file);
+      newMeta.push({
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        content: ''
+      });
+      currentTotalSize += file.size;
+    }
+
+    if (newFiles.length > 0) {
+      setManualFiles(prev => [...prev, ...newFiles]);
+      setManualAttachments(prev => [...prev, ...newMeta]);
     }
 
     if (fileInputRef.current) {
@@ -157,6 +153,7 @@ export default function OfertaEmailModal({ isOpen, onClose, onSuccess, oferta, u
   };
 
   const removeAttachment = (index: number) => {
+    setManualFiles(prev => prev.filter((_, i) => i !== index));
     setManualAttachments(prev => prev.filter((_, i) => i !== index));
   };
 
@@ -169,22 +166,23 @@ export default function OfertaEmailModal({ isOpen, onClose, onSuccess, oferta, u
 
     setSending(true);
     try {
+      const formData = new FormData();
+      formData.append('oferta_id', oferta.id);
+      formData.append('tip_email', tipEmail);
+      formData.append('subiect', subiect.trim());
+      formData.append('continut', continut.trim());
+      formData.append('destinatari', JSON.stringify(emailList));
+      formData.append('attach_docx', String(attachDocx && tipEmail === 'oferta'));
+      formData.append('attach_pdf', String(attachPdf && tipEmail === 'oferta'));
+      formData.append('attach_pdf_complet', String(attachPdfComplet && tipEmail === 'oferta'));
+      formData.append('trimis_de', userId || '');
+      formData.append('trimis_de_nume', userName || '');
+      formData.append('from_address', fromAddress);
+      manualFiles.forEach(file => formData.append('manual_files', file, file.name));
+
       const res = await fetch('/api/rapoarte/oferte/send-email', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          oferta_id: oferta.id,
-          tip_email: tipEmail,
-          subiect: subiect.trim(),
-          continut: continut.trim(),
-          destinatari: emailList,
-          attach_docx: attachDocx && tipEmail === 'oferta',
-          attach_pdf: attachPdf && tipEmail === 'oferta',
-          manual_attachments: manualAttachments.length > 0 ? manualAttachments : undefined,
-          trimis_de: userId,
-          trimis_de_nume: userName,
-          from_address: fromAddress
-        })
+        body: formData
       });
       const data = await res.json();
       if (data.success) {
@@ -293,7 +291,13 @@ export default function OfertaEmailModal({ isOpen, onClose, onSuccess, oferta, u
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <input type="checkbox" checked={attachPdf} onChange={e => setAttachPdf(e.target.checked)} id="attach-pdf" />
                   <label htmlFor="attach-pdf" style={{ fontSize: '13px', color: '#495057', cursor: 'pointer' }}>
-                    Ataseaza oferta PDF (se genereaza automat)
+                    Ataseaza oferta PDF simplificat (rezumat - pentru clienti mici)
+                  </label>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <input type="checkbox" checked={attachPdfComplet} onChange={e => setAttachPdfComplet(e.target.checked)} id="attach-pdf-complet" />
+                  <label htmlFor="attach-pdf-complet" style={{ fontSize: '13px', color: '#495057', cursor: 'pointer' }}>
+                    Ataseaza oferta PDF complet (acelasi continut ca DOCX)
                   </label>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -360,7 +364,7 @@ export default function OfertaEmailModal({ isOpen, onClose, onSuccess, oferta, u
             )}
             {manualAttachments.length === 0 && (
               <div style={{ fontSize: '12px', color: '#95a5a6', fontStyle: 'italic' }}>
-                Niciun fisier atasat manual. Accepta: PDF, DOC, DOCX, XLS, XLSX, imagini, TXT, CSV, ZIP (max 10MB/fisier)
+                Niciun fisier atasat manual. Accepta: PDF, DOC, DOCX, XLS, XLSX, imagini, TXT, CSV, ZIP (max 10MB/fisier, total 4MB)
               </div>
             )}
           </div>

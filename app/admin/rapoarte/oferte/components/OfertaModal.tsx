@@ -7,6 +7,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import ClientNouModal from '../../clienti/components/ClientNouModal';
 
 interface Serviciu {
   denumire: string;
@@ -180,16 +181,19 @@ export default function OfertaModal({ isOpen, onClose, onSuccess, oferta, userId
   const [clientSearch, setClientSearch] = useState('');
   const [clientSuggestions, setClientSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [showClientNouModal, setShowClientNouModal] = useState(false);
+  const [searchedAtLeastOnce, setSearchedAtLeastOnce] = useState(false);
 
   // Client autocomplete
   useEffect(() => {
-    if (clientSearch.length < 2) { setClientSuggestions([]); return; }
+    if (clientSearch.length < 2) { setClientSuggestions([]); setSearchedAtLeastOnce(false); return; }
     const timer = setTimeout(async () => {
       try {
         const res = await fetch(`/api/rapoarte/clienti?search=${encodeURIComponent(clientSearch)}`);
         const data = await res.json();
         setClientSuggestions(data.data || data || []);
         setShowSuggestions(true);
+        setSearchedAtLeastOnce(true);
       } catch { /* ignore */ }
     }, 300);
     return () => clearTimeout(timer);
@@ -207,6 +211,23 @@ export default function OfertaModal({ isOpen, onClose, onSuccess, oferta, userId
     }));
     setClientSearch('');
     setShowSuggestions(false);
+  };
+
+  // Dupa adaugare client nou (din ANAF sau manual), il selecteaza automat
+  const handleClientAdded = async () => {
+    setShowClientNouModal(false);
+    // Re-fetch ultimii clienti adaugati si selecteaza pe cel mai recent care matches search-ul curent
+    try {
+      const searchTerm = clientSearch.trim() || form.client_cui || form.client_nume;
+      if (!searchTerm) return;
+      const res = await fetch(`/api/rapoarte/clienti?search=${encodeURIComponent(searchTerm)}`);
+      const data = await res.json();
+      const list = data.data || data || [];
+      if (list.length > 0) {
+        // Sortat descrescator dupa data_creare; alegem primul (cel mai recent)
+        selectClient(list[0]);
+      }
+    } catch { /* ignore */ }
   };
 
   const handleChange = (field: string, value: any) => {
@@ -340,31 +361,67 @@ export default function OfertaModal({ isOpen, onClose, onSuccess, oferta, userId
 
             <div style={{ marginBottom: '1rem', position: 'relative' }}>
               <label style={labelStyle}>Cauta client existent</label>
-              <input
-                type="text"
-                placeholder="Cauta dupa nume, CUI, email..."
-                value={clientSearch}
-                onChange={e => setClientSearch(e.target.value)}
-                onFocus={() => clientSuggestions.length > 0 && setShowSuggestions(true)}
-                onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-                style={inputStyle}
-              />
-              {showSuggestions && clientSuggestions.length > 0 && (
-                <div style={{
-                  position: 'absolute', top: '100%', left: 0, right: 0, background: 'white',
-                  border: '1px solid #dee2e6', borderRadius: '8px', maxHeight: '200px', overflowY: 'auto', zIndex: 51000, boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-                }}>
-                  {clientSuggestions.slice(0, 10).map((c: any) => (
-                    <div key={c.id}
-                      onClick={() => selectClient(c)}
-                      style={{ padding: '10px 16px', cursor: 'pointer', borderBottom: '1px solid #f0f0f0', fontSize: '14px' }}
-                      onMouseEnter={e => (e.currentTarget.style.background = '#f8f9fa')}
-                      onMouseLeave={e => (e.currentTarget.style.background = 'white')}
-                    >
-                      <div style={{ fontWeight: '500' }}>{c.nume}</div>
-                      <div style={{ fontSize: '12px', color: '#95a5a6' }}>{c.cui} | {c.email}</div>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <div style={{ flex: 1, position: 'relative' }}>
+                  <input
+                    type="text"
+                    placeholder="Cauta dupa nume, CUI, email..."
+                    value={clientSearch}
+                    onChange={e => setClientSearch(e.target.value)}
+                    onFocus={() => clientSuggestions.length > 0 && setShowSuggestions(true)}
+                    onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                    style={inputStyle}
+                  />
+                  {showSuggestions && clientSuggestions.length > 0 && (
+                    <div style={{
+                      position: 'absolute', top: '100%', left: 0, right: 0, background: 'white',
+                      border: '1px solid #dee2e6', borderRadius: '8px', maxHeight: '200px', overflowY: 'auto', zIndex: 51000, boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                    }}>
+                      {clientSuggestions.slice(0, 10).map((c: any) => (
+                        <div key={c.id}
+                          onClick={() => selectClient(c)}
+                          style={{ padding: '10px 16px', cursor: 'pointer', borderBottom: '1px solid #f0f0f0', fontSize: '14px' }}
+                          onMouseEnter={e => (e.currentTarget.style.background = '#f8f9fa')}
+                          onMouseLeave={e => (e.currentTarget.style.background = 'white')}
+                        >
+                          <div style={{ fontWeight: '500' }}>{c.nume}</div>
+                          <div style={{ fontSize: '12px', color: '#95a5a6' }}>{c.cui} | {c.email}</div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowClientNouModal(true)}
+                  style={{
+                    padding: '0.6rem 1rem',
+                    borderRadius: '10px',
+                    border: 'none',
+                    background: '#27ae60',
+                    color: 'white',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    boxShadow: '0 2px 6px rgba(39,174,96,0.25)'
+                  }}
+                  title="Adauga client nou - cu cautare automata in ANAF dupa CUI"
+                >
+                  + Client din ANAF
+                </button>
+              </div>
+              {searchedAtLeastOnce && clientSuggestions.length === 0 && clientSearch.length >= 2 && (
+                <div style={{
+                  marginTop: '6px',
+                  fontSize: '12px',
+                  color: '#7f8c8d',
+                  background: '#fff8e1',
+                  border: '1px solid #ffe082',
+                  borderRadius: '8px',
+                  padding: '8px 10px'
+                }}>
+                  Niciun client gasit. Apasa <strong>+ Client din ANAF</strong> pentru a adauga rapid din baza ANAF dupa CUI.
                 </div>
               )}
             </div>
@@ -670,6 +727,14 @@ export default function OfertaModal({ isOpen, onClose, onSuccess, oferta, userId
           </button>
         </div>
       </div>
+
+      {showClientNouModal && (
+        <ClientNouModal
+          isOpen={showClientNouModal}
+          onClose={() => setShowClientNouModal(false)}
+          onClientAdded={handleClientAdded}
+        />
+      )}
     </div>
   );
 }

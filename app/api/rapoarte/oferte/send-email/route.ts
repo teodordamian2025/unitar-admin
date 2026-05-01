@@ -1,19 +1,19 @@
 // ==================================================================
 // CALEA: app/api/rapoarte/oferte/send-email/route.ts
-// DATA: 08.04.2026
+// DATA: 08.04.2026 (refactor 01.05.2026 - multipart/form-data + PDF complet)
 // DESCRIERE: API pentru trimiterea ofertelor pe email
-// ACTUALIZAT: Adaugat generare PDF on-the-fly, DOCX on-the-fly, manual attachments
-// PATTERN: Reutilizeaza client-email/send + sendEmail din notifications
+// ACTUALIZAT:
+//   - multipart/form-data in loc de JSON+base64 (rezolva 413 pe Vercel)
+//   - suport pentru attach_pdf_complet (DOCX -> HTML -> PDF prin mammoth + puppeteer)
+// PATTERN: Reutilizeaza generateOfertaDocx + sendEmail din notifications
 // ==================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 import { sendEmail, wrapEmailHTML, isValidEmail } from '@/lib/notifications/send-email';
 import { launchBrowser } from '@/lib/puppeteer-helper';
-import JSZip from 'jszip';
-import { readFile } from 'fs/promises';
-import { existsSync } from 'fs';
-import path from 'path';
+import { generateOfertaDocx } from '@/lib/oferte-docx-generator';
+import mammoth from 'mammoth';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -41,37 +41,53 @@ const escapeValue = (val: string | null | undefined): string => {
   return `'${String(val).replace(/\\/g, '\\\\').replace(/'/g, "''").replace(/\n/g, '\\n').replace(/\r/g, '\\r')}'`;
 };
 
-// Generate DOCX buffer from template (same logic as generate/route.ts but returns buffer)
-async function generateDocxBuffer(oferta: any): Promise<Buffer | null> {
-  const TEMPLATES_DIR = path.join(process.cwd(), 'uploads', 'oferte', 'templates');
-  const TEMPLATE_MAP: Record<string, string> = {
-    'consolidari': 'Oferta_Consolidari.docx',
-    'constructii_noi': 'Oferta_Constructii_Noi.docx',
-    'expertiza_monument': 'Oferta_Expertiza_Monument.docx',
-    'expertiza_tehnica': 'Oferta_Expertiza_Tehnica.docx',
-    'statie_electrica': 'Oferta_Statie_Electrica_Model.docx',
-  };
+const PDF_COMPLET_STYLES = `
+  * { box-sizing: border-box; }
+  body { font-family: 'Calibri', 'Arial', sans-serif; font-size: 11pt; color: #2c3e50; line-height: 1.5; margin: 0; padding: 0; }
+  h1 { font-size: 18pt; margin: 14pt 0 8pt; color: #2c3e50; }
+  h2 { font-size: 15pt; margin: 12pt 0 6pt; color: #2c3e50; }
+  h3 { font-size: 13pt; margin: 10pt 0 5pt; color: #2c3e50; }
+  h4 { font-size: 12pt; margin: 8pt 0 4pt; color: #2c3e50; }
+  p { margin: 5pt 0; }
+  table { border-collapse: collapse; margin: 8pt 0; width: 100%; }
+  td, th { border: 1px solid #b0b0b0; padding: 5pt 7pt; vertical-align: top; }
+  th { background: #ecf0f1; font-weight: 600; }
+  ul, ol { margin: 5pt 0 5pt 20pt; padding: 0; }
+  li { margin: 2pt 0; }
+  strong, b { font-weight: 700; }
+  em, i { font-style: italic; }
+  img { max-width: 100%; height: auto; }
+`;
 
-  const tipOferta = oferta.tip_oferta || 'expertiza_tehnica';
-  const templateFile = TEMPLATE_MAP[tipOferta];
-  if (!templateFile) return null;
-
-  const templatePath = path.join(TEMPLATES_DIR, templateFile);
-  if (!existsSync(templatePath)) return null;
-
+async function generatePdfCompletBuffer(oferta: any): Promise<Buffer | null> {
+  let browser;
   try {
-    const templateBuffer = await readFile(templatePath);
-    const zip = new JSZip();
-    await zip.loadAsync(templateBuffer);
-    // Return the template as-is for attachment (full generation is complex)
-    // The user should generate DOCX first via the dedicated endpoint
-    return Buffer.from(await zip.generateAsync({ type: 'nodebuffer' }));
-  } catch {
+    const docxResult = await generateOfertaDocx(oferta);
+    const mammothResult = await mammoth.convertToHtml({ buffer: docxResult.buffer });
+    const bodyHtml = mammothResult.value || '';
+
+    const fullHtml = `<!DOCTYPE html>
+<html lang="ro"><head><meta charset="UTF-8"><title>${oferta.numar_oferta || 'Oferta'}</title><style>${PDF_COMPLET_STYLES}</style></head><body>${bodyHtml}</body></html>`;
+
+    browser = await launchBrowser();
+    const page = await browser.newPage();
+    await page.setContent(fullHtml, { waitUntil: 'networkidle0' });
+    const pdfBuffer = await page.pdf({
+      format: 'A4',
+      printBackground: true,
+      margin: { top: '20mm', right: '18mm', bottom: '20mm', left: '18mm' }
+    });
+    return Buffer.from(pdfBuffer);
+  } catch (err) {
+    console.error('[OFERTA-EMAIL] Eroare generare PDF complet:', err);
     return null;
+  } finally {
+    if (browser) {
+      try { await browser.close(); } catch { /* ignore */ }
+    }
   }
 }
 
-// Generate PDF buffer using Puppeteer
 async function generatePdfBuffer(oferta: any): Promise<Buffer | null> {
   try {
     const valoare = typeof oferta.valoare === 'object' && oferta.valoare && 'value' in oferta.valoare
@@ -220,22 +236,103 @@ async function generatePdfBuffer(oferta: any): Promise<Buffer | null> {
   }
 }
 
+interface ParsedRequest {
+  oferta_id: string;
+  tip_email?: string;
+  subiect: string;
+  continut: string;
+  destinatari: string[];
+  attach_docx: boolean;
+  attach_pdf: boolean;
+  attach_pdf_complet: boolean;
+  trimis_de?: string;
+  trimis_de_nume?: string;
+  from_address?: string;
+  manual_files: Array<{ name: string; type: string; buffer: Buffer }>;
+}
+
+async function parseRequest(request: NextRequest): Promise<ParsedRequest> {
+  const contentType = request.headers.get('content-type') || '';
+
+  if (contentType.includes('multipart/form-data')) {
+    const form = await request.formData();
+    const destinatariRaw = form.get('destinatari');
+    let destinatari: string[] = [];
+    if (typeof destinatariRaw === 'string') {
+      try {
+        destinatari = JSON.parse(destinatariRaw);
+      } catch {
+        destinatari = destinatariRaw.split(/[,;\s]+/).filter(Boolean);
+      }
+    }
+
+    const manual_files: Array<{ name: string; type: string; buffer: Buffer }> = [];
+    const fileEntries = form.getAll('manual_files');
+    for (const entry of fileEntries) {
+      if (entry instanceof File) {
+        const buf = Buffer.from(await entry.arrayBuffer());
+        manual_files.push({
+          name: entry.name,
+          type: entry.type || 'application/octet-stream',
+          buffer: buf,
+        });
+      }
+    }
+
+    return {
+      oferta_id: String(form.get('oferta_id') || ''),
+      tip_email: String(form.get('tip_email') || ''),
+      subiect: String(form.get('subiect') || ''),
+      continut: String(form.get('continut') || ''),
+      destinatari,
+      attach_docx: String(form.get('attach_docx') || '') === 'true',
+      attach_pdf: String(form.get('attach_pdf') || '') === 'true',
+      attach_pdf_complet: String(form.get('attach_pdf_complet') || '') === 'true',
+      trimis_de: String(form.get('trimis_de') || ''),
+      trimis_de_nume: String(form.get('trimis_de_nume') || ''),
+      from_address: String(form.get('from_address') || ''),
+      manual_files,
+    };
+  }
+
+  // Fallback: JSON body cu manual_attachments base64 (compatibilitate)
+  const body = await request.json();
+  const manual_files: Array<{ name: string; type: string; buffer: Buffer }> = [];
+  if (Array.isArray(body.manual_attachments)) {
+    for (const att of body.manual_attachments) {
+      if (att?.name && att?.content) {
+        manual_files.push({
+          name: att.name,
+          type: att.type || 'application/octet-stream',
+          buffer: Buffer.from(att.content, 'base64'),
+        });
+      }
+    }
+  }
+  return {
+    oferta_id: body.oferta_id,
+    tip_email: body.tip_email,
+    subiect: body.subiect,
+    continut: body.continut,
+    destinatari: Array.isArray(body.destinatari) ? body.destinatari : [],
+    attach_docx: !!body.attach_docx,
+    attach_pdf: !!body.attach_pdf,
+    attach_pdf_complet: !!body.attach_pdf_complet,
+    trimis_de: body.trimis_de,
+    trimis_de_nume: body.trimis_de_nume,
+    from_address: body.from_address,
+    manual_files,
+  };
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const parsed = await parseRequest(request);
     const {
-      oferta_id,
-      tip_email,
-      subiect,
-      continut,
-      destinatari,
-      attach_docx,
-      attach_pdf,
-      manual_attachments,
-      trimis_de,
-      trimis_de_nume,
-      from_address
-    } = body;
+      oferta_id, tip_email, subiect, continut, destinatari,
+      attach_docx, attach_pdf, attach_pdf_complet,
+      trimis_de, trimis_de_nume, from_address, manual_files
+    } = parsed;
 
     if (!oferta_id) {
       return NextResponse.json({ error: 'oferta_id este obligatoriu' }, { status: 400 });
@@ -250,7 +347,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Cel putin un destinatar este obligatoriu' }, { status: 400 });
     }
 
-    // Validare from_address
     const ALLOWED_FROM: Record<string, string> = {
       'office@unitarproiect.eu': 'UNITAR PROIECT <office@unitarproiect.eu>',
       'contact@unitarproiect.eu': 'UNITAR PROIECT <contact@unitarproiect.eu>',
@@ -260,13 +356,11 @@ export async function POST(request: NextRequest) {
     }
     const fromFormatted = ALLOWED_FROM[from_address];
 
-    // Valideaza email-uri
     const validEmails = destinatari.filter((e: string) => isValidEmail(e));
     if (validEmails.length === 0) {
       return NextResponse.json({ error: 'Niciun email valid' }, { status: 400 });
     }
 
-    // Incarca datele ofertei
     const [ofertaRows] = await bigquery.query({
       query: `SELECT * FROM ${TABLE_OFERTE} WHERE id = @id AND activ = true`,
       params: { id: oferta_id },
@@ -279,12 +373,10 @@ export async function POST(request: NextRequest) {
 
     const oferta = ofertaRows[0];
 
-    // Pregateste atasamentele
     const attachments: any[] = [];
 
-    // Atasament PDF (generat on-the-fly)
     if (attach_pdf) {
-      console.log('[OFERTA-EMAIL] Generare PDF pentru atasament...');
+      console.log('[OFERTA-EMAIL] Generare PDF simplificat pentru atasament...');
       const pdfBuffer = await generatePdfBuffer(oferta);
       if (pdfBuffer) {
         attachments.push({
@@ -293,65 +385,58 @@ export async function POST(request: NextRequest) {
           encoding: 'base64' as const,
           contentType: 'application/pdf'
         });
-        console.log('[OFERTA-EMAIL] PDF generat si atasat');
+        console.log('[OFERTA-EMAIL] PDF simplificat generat si atasat');
       } else {
-        console.warn('[OFERTA-EMAIL] Nu s-a putut genera PDF-ul');
+        console.warn('[OFERTA-EMAIL] Nu s-a putut genera PDF-ul simplificat');
       }
     }
 
-    // Atasament DOCX (generat on-the-fly din template)
+    if (attach_pdf_complet) {
+      console.log('[OFERTA-EMAIL] Generare PDF complet (DOCX->HTML->PDF)...');
+      const pdfBuffer = await generatePdfCompletBuffer(oferta);
+      if (pdfBuffer) {
+        attachments.push({
+          filename: `${oferta.numar_oferta || 'oferta'}_complet.pdf`,
+          content: pdfBuffer.toString('base64'),
+          encoding: 'base64' as const,
+          contentType: 'application/pdf'
+        });
+        console.log('[OFERTA-EMAIL] PDF complet generat si atasat');
+      } else {
+        console.warn('[OFERTA-EMAIL] Nu s-a putut genera PDF-ul complet');
+      }
+    }
+
     if (attach_docx) {
       console.log('[OFERTA-EMAIL] Generare DOCX pentru atasament...');
-      // First try to use the dedicated generate endpoint to get a properly filled DOCX
       try {
-        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.VERCEL_URL
-          ? `https://${process.env.VERCEL_URL}`
-          : 'http://localhost:3000';
-
-        const genResponse = await fetch(`${baseUrl}/api/actions/oferte/generate`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ oferta_id: oferta.id })
+        const docxResult = await generateOfertaDocx(oferta);
+        attachments.push({
+          filename: `${oferta.numar_oferta || 'oferta'}.docx`,
+          content: docxResult.buffer.toString('base64'),
+          encoding: 'base64' as const,
+          contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
         });
-
-        if (genResponse.ok) {
-          const docxBuffer = Buffer.from(await genResponse.arrayBuffer());
-          attachments.push({
-            filename: `${oferta.numar_oferta || 'oferta'}.docx`,
-            content: docxBuffer.toString('base64'),
-            encoding: 'base64' as const,
-            contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-          });
-          console.log('[OFERTA-EMAIL] DOCX generat si atasat');
-        } else {
-          console.warn('[OFERTA-EMAIL] Nu s-a putut genera DOCX-ul via API');
-        }
+        console.log('[OFERTA-EMAIL] DOCX generat si atasat');
       } catch (err) {
         console.warn('[OFERTA-EMAIL] Eroare generare DOCX:', err);
       }
     }
 
-    // Atasamente manuale (fisiere uploadate din calculator)
-    if (manual_attachments && Array.isArray(manual_attachments)) {
-      for (const att of manual_attachments) {
-        if (att.name && att.content) {
-          attachments.push({
-            filename: att.name,
-            content: att.content,
-            encoding: 'base64' as const,
-            contentType: att.type || 'application/octet-stream'
-          });
-        }
-      }
+    for (const file of manual_files) {
+      attachments.push({
+        filename: file.name,
+        content: file.buffer.toString('base64'),
+        encoding: 'base64' as const,
+        contentType: file.type
+      });
     }
 
-    // Construieste HTML
     const htmlContent = wrapEmailHTML(
       formatOfertaEmail(continut),
       subiect
     );
 
-    // Trimite email
     const emailResult = await sendEmail({
       to: validEmails,
       from: fromFormatted,
@@ -361,7 +446,6 @@ export async function POST(request: NextRequest) {
       attachments: attachments.length > 0 ? attachments : undefined
     });
 
-    // Log in EmailClientLog_v2
     const logId = `email_log_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const now = new Date().toISOString();
 
@@ -380,7 +464,6 @@ export async function POST(request: NextRequest) {
       location: 'EU',
     });
 
-    // Daca se trimite oferta si e in Draft, actualizeaza status la Trimisa
     if (tip_email === 'oferta' && oferta.status === 'Draft') {
       const escStr = (s: string) => s.replace(/\\/g, '\\\\').replace(/'/g, "''");
       await bigquery.query({
