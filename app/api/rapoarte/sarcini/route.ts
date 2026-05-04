@@ -31,8 +31,15 @@ const bigquery = new BigQuery({
 });
 
 // Helper function pentru escape SQL
+// IMPORTANT: escape backslash FIRST, apoi quote, apoi newlines/CR
+// (altfel \n devine \\n care e tratat ca backslash + n in BigQuery)
 const escapeString = (value: string): string => {
-  return value.replace(/'/g, "''");
+  return value
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "''")
+    .replace(/\n/g, '\\n')
+    .replace(/\r/g, '\\r')
+    .replace(/\t/g, '\\t');
 };
 
 // Helper pentru formatare DATE BigQuery

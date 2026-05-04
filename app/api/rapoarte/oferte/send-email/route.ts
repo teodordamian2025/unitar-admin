@@ -449,20 +449,30 @@ export async function POST(request: NextRequest) {
     const logId = `email_log_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const now = new Date().toISOString();
 
-    await bigquery.query({
-      query: `
-        INSERT INTO ${TABLE_EMAIL_LOG}
-        (id, proiect_id, client_id, client_nume, tip_email, subiect, destinatari, continut_preview, template_folosit, trimis_de, trimis_de_nume, email_status, email_message_id, email_error, data_trimitere, data_creare)
-        VALUES
-        (${escapeValue(logId)}, ${escapeValue(oferta_id)}, ${escapeValue(oferta.client_id)}, ${escapeValue(oferta.client_nume)},
-         ${escapeValue(tip_email || 'oferta')}, ${escapeValue(subiect.trim())}, ${escapeValue(JSON.stringify(validEmails))},
-         ${escapeValue(continut.trim().substring(0, 500))}, ${escapeValue('oferta_email')},
-         ${escapeValue(trimis_de)}, ${escapeValue(trimis_de_nume)},
-         ${escapeValue(emailResult.success ? 'trimis' : 'eroare')}, ${escapeValue(emailResult.messageId)},
-         ${escapeValue(emailResult.error)}, TIMESTAMP('${now}'), TIMESTAMP('${now}'))
-      `,
-      location: 'EU',
-    });
+    // EmailClientLog_v2.client_id este REQUIRED în schema BigQuery.
+    // Oferta poate avea client_id = NULL (oferta din calculator, fara client selectat),
+    // deci folosim fallback la oferta_id ca sa pastram referinta trasabila.
+    const clientIdForLog = oferta.client_id || oferta_id;
+
+    try {
+      await bigquery.query({
+        query: `
+          INSERT INTO ${TABLE_EMAIL_LOG}
+          (id, proiect_id, client_id, client_nume, tip_email, subiect, destinatari, continut_preview, template_folosit, trimis_de, trimis_de_nume, email_status, email_message_id, email_error, data_trimitere, data_creare)
+          VALUES
+          (${escapeValue(logId)}, ${escapeValue(oferta_id)}, ${escapeValue(clientIdForLog)}, ${escapeValue(oferta.client_nume)},
+           ${escapeValue(tip_email || 'oferta')}, ${escapeValue(subiect.trim())}, ${escapeValue(JSON.stringify(validEmails))},
+           ${escapeValue(continut.trim().substring(0, 500))}, ${escapeValue('oferta_email')},
+           ${escapeValue(trimis_de)}, ${escapeValue(trimis_de_nume)},
+           ${escapeValue(emailResult.success ? 'trimis' : 'eroare')}, ${escapeValue(emailResult.messageId)},
+           ${escapeValue(emailResult.error)}, TIMESTAMP('${now}'), TIMESTAMP('${now}'))
+        `,
+        location: 'EU',
+      });
+    } catch (logErr) {
+      // Email-ul a fost deja trimis - nu blocam raspunsul daca log-ul esueaza
+      console.error('[OFERTA-EMAIL] Eroare la salvarea log email (non-blocking):', logErr);
+    }
 
     if (tip_email === 'oferta' && oferta.status === 'Draft') {
       const escStr = (s: string) => s.replace(/\\/g, '\\\\').replace(/'/g, "''");
