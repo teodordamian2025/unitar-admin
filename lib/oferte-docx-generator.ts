@@ -10,6 +10,7 @@ import { existsSync } from 'fs';
 import path from 'path';
 
 const TEMPLATES_DIR = path.join(process.cwd(), 'uploads', 'oferte', 'templates');
+const MASTER_PORTFOLIO_FILE = path.join(process.cwd(), 'Oferta-portofoliu.docx');
 
 export const OFERTE_TEMPLATE_MAP: Record<string, string> = {
   'consolidari': 'Oferta_Consolidari.docx',
@@ -18,6 +19,100 @@ export const OFERTE_TEMPLATE_MAP: Record<string, string> = {
   'expertiza_tehnica': 'Oferta_Expertiza_Tehnica.docx',
   'statie_electrica': 'Oferta_Statie_Electrica_Model.docx',
 };
+
+const PORTFOLIO_INJECT_TYPES: ReadonlySet<string> = new Set([
+  'constructii_noi',
+  'consolidari',
+  'expertiza_tehnica',
+  'expertiza_monument',
+  'statie_electrica',
+]);
+
+let cachedMasterPortfolioBlock: string | null | undefined;
+
+function findContainingParagraphStart(xml: string, text: string): number {
+  const idx = xml.indexOf(text);
+  if (idx < 0) return -1;
+  const re = /<w:p(?:\s|>)/g;
+  let lastStart = -1;
+  let m;
+  while ((m = re.exec(xml)) !== null) {
+    if (m.index >= idx) break;
+    lastStart = m.index;
+  }
+  return lastStart;
+}
+
+function findContainingParagraphEnd(xml: string, text: string): number {
+  const idx = xml.indexOf(text);
+  if (idx < 0) return -1;
+  const close = xml.indexOf('</w:p>', idx);
+  if (close < 0) return -1;
+  return close + '</w:p>'.length;
+}
+
+async function loadMasterPortfolioBlock(): Promise<string | null> {
+  if (cachedMasterPortfolioBlock !== undefined) return cachedMasterPortfolioBlock;
+
+  if (!existsSync(MASTER_PORTFOLIO_FILE)) {
+    console.warn(`[oferte-docx] Master portofoliu lipsa: ${MASTER_PORTFOLIO_FILE} — folosesc portofoliile din template`);
+    cachedMasterPortfolioBlock = null;
+    return null;
+  }
+
+  try {
+    const buf = await readFile(MASTER_PORTFOLIO_FILE);
+    const zip = new JSZip();
+    await zip.loadAsync(buf);
+    const xml = await zip.file('word/document.xml')?.async('string');
+    if (!xml) {
+      cachedMasterPortfolioBlock = null;
+      return null;
+    }
+
+    const FIRST_HEADER = 'Din portofoliul nostru construcții noi:';
+    const LAST_ITEM = 'Mănăstirea Cașin (Parcul Domenii) — expertiză structurală';
+
+    const startIdx = findContainingParagraphStart(xml, FIRST_HEADER);
+    const endIdx = findContainingParagraphEnd(xml, LAST_ITEM);
+
+    if (startIdx < 0 || endIdx < 0 || startIdx >= endIdx) {
+      console.warn('[oferte-docx] Marcaje portofoliu master inexistente — folosesc fallback template');
+      cachedMasterPortfolioBlock = null;
+      return null;
+    }
+
+    let block = xml.substring(startIdx, endIdx);
+    block = block
+      .replace(/\s+w:rsidR="[^"]*"/g, '')
+      .replace(/\s+w:rsidRDefault="[^"]*"/g, '')
+      .replace(/\s+w:rsidRPr="[^"]*"/g, '')
+      .replace(/\s+w:rsidP="[^"]*"/g, '')
+      .replace(/\s+w:rsidTr="[^"]*"/g, '')
+      .replace(/\s+w14:paraId="[^"]*"/g, '')
+      .replace(/\s+w14:textId="[^"]*"/g, '');
+
+    cachedMasterPortfolioBlock = block;
+    console.log(`[oferte-docx] Portofoliu master incarcat (${block.length} chars)`);
+    return block;
+  } catch (err) {
+    console.error('[oferte-docx] Eroare la incarcarea portofoliului master:', err);
+    cachedMasterPortfolioBlock = null;
+    return null;
+  }
+}
+
+function injectMasterPortfolio(templateXml: string, masterBlock: string): string {
+  const portfolioStart = findContainingParagraphStart(templateXml, 'Din portofoliul');
+  const cuStimStart = findContainingParagraphStart(templateXml, 'Cu stim');
+
+  if (portfolioStart < 0 || cuStimStart < 0 || portfolioStart >= cuStimStart) {
+    console.warn('[oferte-docx] Marcaje portofoliu lipsa in template — pastreaza portofoliul existent');
+    return templateXml;
+  }
+
+  return templateXml.substring(0, portfolioStart) + masterBlock + templateXml.substring(cuStimStart);
+}
 
 function escapeXml(str: string): string {
   return str
@@ -363,7 +458,14 @@ export async function generateOfertaDocx(oferta: OfertaForDocx): Promise<DocxGen
   const { detalii_tehnice: rawDetalii, ...restData } = templateData;
   const escapedData = escapeDataForXml(restData);
   escapedData.detalii_tehnice = rawDetalii;
-  const processedXml = processOfertaPlaceholders(documentXml, escapedData);
+  let processedXml = processOfertaPlaceholders(documentXml, escapedData);
+
+  if (PORTFOLIO_INJECT_TYPES.has(tipOferta)) {
+    const masterBlock = await loadMasterPortfolioBlock();
+    if (masterBlock) {
+      processedXml = injectMasterPortfolio(processedXml, masterBlock);
+    }
+  }
 
   zip.file('word/document.xml', processedXml);
 
