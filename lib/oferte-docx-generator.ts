@@ -92,6 +92,12 @@ async function loadMasterPortfolioBlock(): Promise<string | null> {
       .replace(/\s+w14:paraId="[^"]*"/g, '')
       .replace(/\s+w14:textId="[^"]*"/g, '');
 
+    // Remap toate referintele numId la "2" — singurul numId garantat in toate
+    // template-urile. Master-ul foloseste numId 2/3/4/5 (cate o lista per
+    // sectiune), dar template-urile nu au toate aceste id-uri definite in
+    // numbering.xml, ceea ce face Word sa refuze deschiderea fisierului.
+    block = block.replace(/(<w:numId\s+w:val=")\d+(")/g, '$12$2');
+
     cachedMasterPortfolioBlock = block;
     console.log(`[oferte-docx] Portofoliu master incarcat (${block.length} chars)`);
     return block;
@@ -111,7 +117,16 @@ function injectMasterPortfolio(templateXml: string, masterBlock: string): string
     return templateXml;
   }
 
-  return templateXml.substring(0, portfolioStart) + masterBlock + templateXml.substring(cuStimStart);
+  // "Cu stim" se afla intr-un tabel (semnatura/contact) in toate template-urile,
+  // deci taierea la cuStimStart ar rupe deschiderea <w:tbl><w:tr><w:tc>. Daca
+  // gasim un <w:tbl> intre portofoliu si "Cu stim", taiem la inceputul lui ca sa
+  // pastram tabelul intact. Altfel folosim cuStimStart ca fallback.
+  const nextTblPlain = templateXml.indexOf('<w:tbl>', portfolioStart);
+  const nextTblWithAttr = templateXml.indexOf('<w:tbl ', portfolioStart);
+  const candidates = [nextTblPlain, nextTblWithAttr].filter(i => i >= 0 && i < cuStimStart);
+  const cutEnd = candidates.length > 0 ? Math.min(...candidates) : cuStimStart;
+
+  return templateXml.substring(0, portfolioStart) + masterBlock + templateXml.substring(cutEnd);
 }
 
 function escapeXml(str: string): string {

@@ -582,7 +582,7 @@ export default function ClientEditModal({ isOpen, onClose, onClientUpdated, clie
                     value={formData.oras}
                     onChange={(e) => handleInputChange('oras', e.target.value)}
                     disabled={loading}
-                    placeholder="București"
+                    placeholder="Oraș sau SECTOR1 după caz"
                     style={{
                       width: '100%',
                       padding: '0.75rem',
