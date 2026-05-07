@@ -37,6 +37,19 @@ function escapeXml(str: string): string {
     .replace(/'/g, '&apos;');
 }
 
+// Sanitizare valoare pentru HTTP header (ByteString / Latin-1, valori 0-255).
+// Convertește smart quotes și caractere non-ASCII pentru a preveni TypeError la NextResponse.
+function sanitizeHeaderValue(value: string): string {
+  if (!value) return '';
+  return value
+    .replace(/[‘’‚‛]/g, "'")  // smart single quotes → '
+    .replace(/[“”„‟]/g, '"')  // smart double quotes → "
+    .replace(/[–—―]/g, '-')         // en/em dash → -
+    .replace(/[…]/g, '...')                   // ellipsis
+    .replace(/[ ]/g, ' ')                     // non-breaking space → space
+    .replace(/[^\x00-\xFF]/g, '?');                // orice alt caracter non-Latin1 → ?
+}
+
 // Escapare recursivă a tuturor string-urilor dintr-un obiect de date (pentru template DOCX)
 function escapeDataForXml(data: any): any {
   if (typeof data === 'string') return escapeXml(data);
@@ -1127,18 +1140,19 @@ export async function POST(request: NextRequest) {
 
     const fileName = `${pvData.numar_pv}.docx`;
 
+    const safeFileName = sanitizeHeaderValue(fileName);
     const response = new NextResponse(pvBuffer, {
       status: 200,
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'Content-Disposition': `attachment; filename="${fileName}"`,
+        'Content-Disposition': `attachment; filename="${safeFileName}"; filename*=UTF-8''${encodeURIComponent(fileName)}`,
         'Content-Length': pvBuffer.length.toString(),
-        
-        'X-PV-Number': pvData.numar_pv,
-        'X-PV-ID': pvId,
-        'X-Template-Used': templateUsed,
+
+        'X-PV-Number': sanitizeHeaderValue(pvData.numar_pv),
+        'X-PV-ID': sanitizeHeaderValue(pvId),
+        'X-Template-Used': sanitizeHeaderValue(templateUsed),
         'X-Subproiecte-Count': subproiecteIds.length.toString(),
-        'X-Proiect-ID': proiectId,
+        'X-Proiect-ID': sanitizeHeaderValue(proiectId),
         'X-Contract-Found': contractInfo.contract ? 'true' : 'false',
         'X-Anexe-Count': contractInfo.anexe.length.toString()
       }

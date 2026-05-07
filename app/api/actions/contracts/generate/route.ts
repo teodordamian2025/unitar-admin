@@ -40,6 +40,19 @@ function escapeXml(str: string): string {
     .replace(/'/g, '&apos;');
 }
 
+// Sanitizare valoare pentru HTTP header (ByteString / Latin-1, valori 0-255).
+// Convertește smart quotes și caractere non-ASCII pentru a preveni TypeError la NextResponse.
+function sanitizeHeaderValue(value: string): string {
+  if (!value) return '';
+  return value
+    .replace(/[‘’‚‛]/g, "'")
+    .replace(/[“”„‟]/g, '"')
+    .replace(/[–—―]/g, '-')
+    .replace(/[…]/g, '...')
+    .replace(/[ ]/g, ' ')
+    .replace(/[^\x00-\xFF]/g, '?');
+}
+
 // Escapare recursivă a tuturor string-urilor dintr-un obiect de date (pentru template DOCX)
 function escapeDataForXml(data: any): any {
   if (typeof data === 'string') return escapeXml(data);
@@ -2160,17 +2173,18 @@ export async function POST(request: NextRequest) {
     }
 
     // 9. RĂSPUNSUL FINAL CU HEADERE INFORMATIVE
+    const safeFinalFileName = sanitizeHeaderValue(finalFileName);
     const response = new NextResponse(finalBuffer, {
       status: 200,
       headers: {
         'Content-Type': contentType,
-        'Content-Disposition': `attachment; filename="${finalFileName}"`,
+        'Content-Disposition': `attachment; filename="${safeFinalFileName}"; filename*=UTF-8''${encodeURIComponent(finalFileName)}`,
         'Content-Length': finalBuffer.length.toString(),
-        
+
         // Headere informative pentru frontend
-        'X-Contract-Number': contractData.numar_contract,
-        'X-Contract-ID': contractId,
-        'X-Template-Used': templateUsed,
+        'X-Contract-Number': sanitizeHeaderValue(contractData.numar_contract),
+        'X-Contract-ID': sanitizeHeaderValue(contractId),
+        'X-Template-Used': sanitizeHeaderValue(templateUsed),
         'X-Anexa-Generated': anexaGenerated.toString(),
         'X-Anexa-Number': anexaGenerated ? anexaNumar.toString() : '0',
         'X-Generation-Type': anexaGenerated ? 'dual' : 'single',
