@@ -22,6 +22,7 @@ const TABLE_FACTURI_GENERATE = `\`${PROJECT_ID}.${DATASET}.FacturiGenerate${tabl
 const TABLE_PROIECTE = `\`${PROJECT_ID}.${DATASET}.Proiecte${tableSuffix}\``;
 const TABLE_ETAPE_FACTURI = `\`${PROJECT_ID}.${DATASET}.EtapeFacturi${tableSuffix}\``;
 const TABLE_SUBPROIECTE = `\`${PROJECT_ID}.${DATASET}.Subproiecte${tableSuffix}\``;
+const TABLE_CHITANTE = `\`${PROJECT_ID}.${DATASET}.Chitante${tableSuffix}\``;
 
 console.log(`🔧 Invoices List API - Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
 console.log(`📊 Using tables: FacturiGenerate${tableSuffix}, Proiecte${tableSuffix}, EtapeFacturi${tableSuffix}, Subproiecte${tableSuffix}`);
@@ -56,14 +57,30 @@ export async function GET(request: NextRequest) {
     // Aceasta reduce timpul de răspuns cu ~50% (un singur round-trip la BigQuery)
     let query = `
       WITH incasari_facturi AS (
-        -- Agregăm încasările din EtapeFacturi pentru fiecare factură
+        -- Agregăm încasările din EtapeFacturi + Chitante pentru fiecare factură
+        -- (chitanțele și încasările pe etape sunt evenimente de plată separate, ca în /api/rapoarte/proiecte/plati)
         SELECT
           factura_id,
-          SUM(COALESCE(valoare_incasata, 0)) as total_incasat,
-          MAX(data_incasare) as ultima_data_incasare,
-          MAX(status_incasare) as status_incasare_ef
-        FROM ${TABLE_ETAPE_FACTURI}
-        WHERE activ = true AND factura_id IS NOT NULL
+          SUM(suma) as total_incasat,
+          MAX(data_inc) as ultima_data_incasare,
+          MAX(status_inc) as status_incasare_ef
+        FROM (
+          SELECT
+            factura_id,
+            COALESCE(valoare_incasata, 0) as suma,
+            data_incasare as data_inc,
+            status_incasare as status_inc
+          FROM ${TABLE_ETAPE_FACTURI}
+          WHERE activ = true AND factura_id IS NOT NULL
+          UNION ALL
+          SELECT
+            factura_id,
+            COALESCE(valoare_incasata, 0) as suma,
+            data_chitanta as data_inc,
+            CAST(NULL AS STRING) as status_inc
+          FROM ${TABLE_CHITANTE}
+          WHERE activ = true AND anulata = false AND factura_id IS NOT NULL
+        )
         GROUP BY factura_id
       ),
       facturi_filtrate AS (

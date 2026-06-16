@@ -12,7 +12,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Receipt, AlertTriangle, CheckCircle, Info } from 'lucide-react';
+import { X, Receipt, AlertTriangle, CheckCircle, Info, Download } from 'lucide-react';
 
 interface Factura {
   id: string;
@@ -50,6 +50,8 @@ export default function ChitantaModal({
   const [descriere, setDescriere] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [chitanteExistente, setChitanteExistente] = useState<any[]>([]);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   // Calculeaza rest de plata si tip client
   const total = parseFloat(String(factura.total)) || 0;
@@ -77,6 +79,61 @@ export default function ChitantaModal({
       setError(null);
     }
   }, [isOpen, factura, restDePlata, plafonAplicabil]);
+
+  // Incarca chitantele deja emise pentru aceasta factura (pentru descarcare PDF)
+  const loadChitanteExistente = async () => {
+    try {
+      const response = await fetch(`/api/actions/chitante?facturaId=${encodeURIComponent(factura.id)}`);
+      const result = await response.json();
+      if (result.success && Array.isArray(result.chitante)) {
+        setChitanteExistente(result.chitante);
+      } else {
+        setChitanteExistente([]);
+      }
+    } catch (err) {
+      console.error('Eroare la incarcarea chitantelor existente:', err);
+      setChitanteExistente([]);
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      loadChitanteExistente();
+    }
+  }, [isOpen, factura.id]);
+
+  // Descarca PDF-ul unei chitante
+  const downloadChitantaPdf = async (chitantaId: string, eticheta?: string) => {
+    if (!chitantaId) return;
+    setDownloadingId(chitantaId);
+    try {
+      const response = await fetch('/api/actions/chitante/generate-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chitanta_id: chitantaId })
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || 'Eroare la generarea PDF-ului');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Chitanta_${(eticheta || chitantaId).replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Eroare descarcare chitanta:', err);
+      setError(err instanceof Error ? err.message : 'Eroare la descarcarea chitantei');
+    } finally {
+      setDownloadingId(null);
+    }
+  };
 
   // Validare valoare in timp real
   const valoareNumerica = parseFloat(valoareIncasata) || 0;
@@ -128,6 +185,14 @@ export default function ChitantaModal({
 
       if (!result.success) {
         throw new Error(result.error || 'Eroare la emiterea chitantei');
+      }
+
+      // Descarca automat PDF-ul chitantei nou create
+      if (result.chitanta?.id) {
+        const eticheta = result.chitanta.serie
+          ? `${result.chitanta.serie}-${result.chitanta.numar}`
+          : result.chitanta.numar || result.chitanta.id;
+        await downloadChitantaPdf(result.chitanta.id, eticheta);
       }
 
       onSuccess(result);
@@ -266,6 +331,70 @@ export default function ChitantaModal({
               </div>
             </div>
           </div>
+
+          {/* Chitante deja emise - cu descarcare PDF */}
+          {chitanteExistente.length > 0 && (
+            <div
+              style={{
+                backgroundColor: '#f0fdf4',
+                borderRadius: '12px',
+                padding: '14px 16px',
+                marginBottom: '20px',
+                border: '1px solid #bbf7d0'
+              }}
+            >
+              <div style={{ fontSize: '13px', fontWeight: '600', color: '#15803d', marginBottom: '10px' }}>
+                Chitante emise ({chitanteExistente.length})
+              </div>
+              <div style={{ display: 'grid', gap: '8px' }}>
+                {chitanteExistente.map((ch: any) => {
+                  const eticheta = ch.serie ? `${ch.serie}-${ch.numar}` : (ch.numar || ch.id);
+                  const valoare = parseFloat(String(ch.valoare_incasata)) || 0;
+                  return (
+                    <div
+                      key={ch.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '10px',
+                        backgroundColor: '#ffffff',
+                        borderRadius: '8px',
+                        padding: '8px 12px',
+                        border: '1px solid #e5e7eb'
+                      }}
+                    >
+                      <div style={{ fontSize: '13px', color: '#374151' }}>
+                        <span style={{ fontWeight: '600' }}>{eticheta}</span>
+                        <span style={{ color: '#6b7280', marginLeft: '8px' }}>{formatCurrency(valoare)}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => downloadChitantaPdf(ch.id, eticheta)}
+                        disabled={downloadingId === ch.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          padding: '6px 12px',
+                          fontSize: '12px',
+                          fontWeight: '600',
+                          border: '1px solid #16a34a',
+                          borderRadius: '8px',
+                          backgroundColor: downloadingId === ch.id ? '#dcfce7' : '#ffffff',
+                          color: '#16a34a',
+                          cursor: downloadingId === ch.id ? 'not-allowed' : 'pointer'
+                        }}
+                      >
+                        <Download size={14} />
+                        {downloadingId === ch.id ? 'Se descarca...' : 'PDF'}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Plafon Info */}
           <div
