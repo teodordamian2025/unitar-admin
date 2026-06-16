@@ -230,6 +230,14 @@ export async function POST(request: NextRequest) {
     const nouStatus = nouaValoarePlatita >= totalFactura ? 'incasata' :
                       (nouaValoarePlatita > 0 ? 'partial_incasata' : factura.status);
 
+    // Formatare data_chitanta ca DATE literal (parametrii DATE in DML INSERT
+    // ajung NULL prin clientul BigQuery Node.js - folosim literal ca in restul codebase-ului)
+    const dataChitantaValue = data_chitanta || new Date().toISOString().split('T')[0];
+    const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    const dataChitantaLiteral = isoDateRegex.test(dataChitantaValue)
+      ? `DATE('${dataChitantaValue}')`
+      : `DATE('${new Date().toISOString().split('T')[0]}')`;
+
     // Extrage proiect_denumire din date_complete_json
     let proiectDenumire = '';
     try {
@@ -262,7 +270,7 @@ export async function POST(request: NextRequest) {
         @client_id, @client_nume, @client_cui, @tip_client,
         @proiect_id, @proiect_denumire,
         @valoare_incasata, 'RON',
-        @data_chitanta, @reprezentant_legal, @descriere,
+        ${dataChitantaLiteral}, @reprezentant_legal, @descriere,
         @creat_de, @creat_de_nume,
         CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(),
         true, false
@@ -285,7 +293,6 @@ export async function POST(request: NextRequest) {
         proiect_id: factura.proiect_id || '',
         proiect_denumire: proiectDenumire,
         valoare_incasata: valoare_incasata,
-        data_chitanta: data_chitanta || new Date().toISOString().split('T')[0],
         reprezentant_legal: reprezentant_legal || '',
         descriere: descriere || `Incasare partiala/totala factura ${factura.serie ? factura.serie + '-' : ''}${factura.numar}`,
         creat_de: creat_de || '',
@@ -305,7 +312,6 @@ export async function POST(request: NextRequest) {
         proiect_id: 'STRING',
         proiect_denumire: 'STRING',
         valoare_incasata: 'NUMERIC',
-        data_chitanta: 'DATE',
         reprezentant_legal: 'STRING',
         descriere: 'STRING',
         creat_de: 'STRING',
