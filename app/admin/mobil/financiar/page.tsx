@@ -33,10 +33,47 @@ export default function FinanciarPage() {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [stats, setStats] = useState<{ sumaIncasari?: number; sumaPlati?: number } | null>(null);
+  const [sold, setSold] = useState<{
+    total: number;
+    currency: string;
+    cacheAgeMinutes?: number;
+    stale?: boolean;
+  } | null>(null);
+  const [soldLoading, setSoldLoading] = useState(true);
 
   useEffect(() => {
     setPage(1);
   }, [directie]);
+
+  // Sold disponibil — reutilizează endpoint-ul de pe /admin (cache 6h, fără force_refresh)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        setSoldLoading(true);
+        const res = await fetch('/api/tranzactii/smartfintech/balance');
+        const json = await res.json();
+        if (cancelled) return;
+        if (json.success && json.balance) {
+          setSold({
+            total: json.balance.total,
+            currency: json.balance.currency || 'RON',
+            cacheAgeMinutes: json.balance.cacheAgeMinutes,
+            stale: json.balance.stale,
+          });
+        } else {
+          setSold(null);
+        }
+      } catch {
+        if (!cancelled) setSold(null);
+      } finally {
+        if (!cancelled) setSoldLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -84,6 +121,8 @@ export default function FinanciarPage() {
       <MobileTopBar title="Financiar" userId={user?.uid} />
 
       <div style={{ padding: 12, maxWidth: 720, margin: '0 auto' }}>
+        <SoldCard sold={sold} loading={soldLoading} />
+
         <FinanciarChart />
 
         {/* Quick stats */}
@@ -192,6 +231,76 @@ export default function FinanciarPage() {
         )}
       </div>
     </>
+  );
+}
+
+function SoldCard({
+  sold,
+  loading,
+}: {
+  sold: { total: number; currency: string; cacheAgeMinutes?: number; stale?: boolean } | null;
+  loading: boolean;
+}) {
+  const ageLabel =
+    sold?.cacheAgeMinutes != null
+      ? sold.cacheAgeMinutes < 60
+        ? `acum ${sold.cacheAgeMinutes} min`
+        : `acum ${Math.floor(sold.cacheAgeMinutes / 60)} h`
+      : null;
+
+  return (
+    <div
+      style={{
+        background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)',
+        borderRadius: 14,
+        padding: 16,
+        marginBottom: 12,
+        color: '#fff',
+        boxShadow: '0 2px 8px rgba(30, 58, 138, 0.25)',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+        <span
+          style={{
+            width: 30,
+            height: 30,
+            borderRadius: 8,
+            background: 'rgba(255,255,255,0.18)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 17,
+          }}
+        >
+          🏦
+        </span>
+        <span style={{ fontSize: 12, fontWeight: 500, color: 'rgba(255,255,255,0.85)' }}>
+          Sold disponibil
+        </span>
+      </div>
+      <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: '-0.5px' }}>
+        {loading
+          ? '…'
+          : sold != null
+            ? new Intl.NumberFormat('ro-RO', {
+                style: 'currency',
+                currency: sold.currency || 'RON',
+                maximumFractionDigits: 2,
+              }).format(sold.total)
+            : 'N/A'}
+      </div>
+      {!loading && sold != null && ageLabel && (
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginTop: 4 }}>
+          Actualizat {ageLabel}
+          {sold.stale ? ' • necesită reîmprospătare' : ''}
+        </div>
+      )}
+      {!loading && sold == null && (
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginTop: 4 }}>
+          Indisponibil momentan
+        </div>
+      )}
+    </div>
   );
 }
 
