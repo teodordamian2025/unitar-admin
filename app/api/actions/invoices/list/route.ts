@@ -208,6 +208,7 @@ export async function GET(request: NextRequest) {
     // ✅ FIX 24.01.2026: Adăugat căutare server-side pentru search
     if (search && search.trim()) {
       query += ` AND (
+        LOWER(fg.id) LIKE LOWER(@search) OR
         LOWER(fg.serie) LIKE LOWER(@search) OR
         LOWER(CAST(fg.numar AS STRING)) LIKE LOWER(@search) OR
         LOWER(CONCAT(COALESCE(fg.serie, ''), '-', CAST(fg.numar AS STRING))) LIKE LOWER(@search) OR

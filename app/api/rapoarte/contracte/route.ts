@@ -641,6 +641,7 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search');
     if (search && search.trim()) {
       whereClause += ` AND (
+        LOWER(c.ID_Contract) LIKE LOWER(@search) OR
         LOWER(c.numar_contract) LIKE LOWER(@search) OR
         LOWER(c.client_nume) LIKE LOWER(@search) OR
         LOWER(c.Denumire_Contract) LIKE LOWER(@search) OR
