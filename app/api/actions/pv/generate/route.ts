@@ -37,6 +37,15 @@ function escapeXml(str: string): string {
     .replace(/'/g, '&apos;');
 }
 
+// Escapare valori string pentru literal SQL BigQuery (GoogleSQL).
+// CRITIC: ID-urile (proiect_id, contract_id, subproiect_id) pot conține backslash
+// (ex: "...expertiza\Rezistenta"), interpretat de GoogleSQL ca secvență de escape.
+// Fără escapare, "\R" produce "Illegal escape sequence: \R". Escapăm \ -> \\ și ' -> ''.
+function escapeSqlString(value: any): string {
+  if (value === null || value === undefined) return '';
+  return String(value).replace(/\\/g, '\\\\').replace(/'/g, "''");
+}
+
 // Sanitizare valoare pentru HTTP header (ByteString / Latin-1, valori 0-255).
 // Convertește smart quotes și caractere non-ASCII pentru a preveni TypeError la NextResponse.
 function sanitizeHeaderValue(value: string): string {
@@ -310,7 +319,7 @@ async function findContractAndAnexeForSubproiecte(proiectId: string, subproiecte
 
     // 2. CĂUTARE ANEXE pentru subproiectele selectate (doar dacă sunt subproiecte)
     if (subproiecteIds.length > 0) {
-      const subproiecteList = subproiecteIds.map(id => `'${id}'`).join(',');
+      const subproiecteList = subproiecteIds.map(id => `'${escapeSqlString(id)}'`).join(',');
       
       const anexeQuery = `
         SELECT DISTINCT 
@@ -363,7 +372,7 @@ async function findContractAndAnexeForSubproiecte(proiectId: string, subproiecte
       const etapeContractQuery = `
         SELECT DISTINCT subproiect_id
         FROM ${TABLE_ETAPE_CONTRACT}
-        WHERE contract_id = '${contractData.id_contract}'
+        WHERE contract_id = '${escapeSqlString(contractData.id_contract)}'
           AND subproiect_id IS NOT NULL
           AND activ = true
       `;
@@ -949,13 +958,13 @@ async function salveazaPVInBigQuery(pvInfo: any): Promise<string> {
        valoare_totala, moneda, valoare_ron, observatii, 
        activ, versiune, data_creare, data_actualizare, creat_de)
       VALUES (
-        '${pvId}',
-        '${pvInfo.pvData.numar_pv}',
-        '${pvInfo.pvData.serie}',
+        '${escapeSqlString(pvId)}',
+        '${escapeSqlString(pvInfo.pvData.numar_pv)}',
+        '${escapeSqlString(pvInfo.pvData.serie)}',
         'pv',
-        '${pvInfo.proiectId}',
-        ${pvInfo.subproiecteIds.length > 0 ? `PARSE_JSON('${JSON.stringify(pvInfo.subproiecteIds)}')` : 'NULL'},
-        ${pvInfo.proiect.client_id ? `'${pvInfo.proiect.client_id}'` : 'NULL'},
+        '${escapeSqlString(pvInfo.proiectId)}',
+        ${pvInfo.subproiecteIds.length > 0 ? `PARSE_JSON('${escapeSqlString(JSON.stringify(pvInfo.subproiecteIds))}')` : 'NULL'},
+        ${pvInfo.proiect.client_id ? `'${escapeSqlString(pvInfo.proiect.client_id)}'` : 'NULL'},
         '${(pvInfo.proiect.client_nume || 'Client necunoscut').replace(/'/g, "''")}',
         '${pvInfo.denumirePV.replace(/'/g, "''")}',
         ${dataPredare},
@@ -995,7 +1004,7 @@ async function actualizeazaStatusPredare(proiectId: string, subproiecteIds: stri
         const updateSubQuery = `
           UPDATE ${TABLE_SUBPROIECTE}
           SET status_predare = 'Predat', data_actualizare = CURRENT_TIMESTAMP()
-          WHERE ID_Subproiect = '${subId}'
+          WHERE ID_Subproiect = '${escapeSqlString(subId)}'
         `;
         queryPromises.push(bigquery.query({ query: updateSubQuery, location: 'EU' }));
       });
@@ -1003,7 +1012,7 @@ async function actualizeazaStatusPredare(proiectId: string, subproiecteIds: stri
       const updateProiectQuery = `
         UPDATE ${TABLE_PROIECTE}
         SET status_predare = 'Predat'
-        WHERE ID_Proiect = '${proiectId}'
+        WHERE ID_Proiect = '${escapeSqlString(proiectId)}'
       `;
       queryPromises.push(bigquery.query({ query: updateProiectQuery, location: 'EU' }));
     }

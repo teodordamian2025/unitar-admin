@@ -31,7 +31,9 @@ const PROIECTE_TABLE = `\`${PROJECT_ID}.${DATASET}.Proiecte${tableSuffix}\``;
 
 // ADĂUGAT: Helper functions ca la Proiecte
 const escapeString = (value: string): string => {
-  return value.replace(/'/g, "''");
+  return value
+    .replace(/\\/g, '\\\\')  // Escape backslash first (ID-uri pot conține '\', ex: ID_Proiect "...expertiza\Rezistenta")
+    .replace(/'/g, "''");
 };
 
 const formatDateLiteral = (dateString: string | null): string => {

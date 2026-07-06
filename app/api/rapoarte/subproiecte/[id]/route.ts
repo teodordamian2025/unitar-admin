@@ -30,7 +30,9 @@ const bigquery = new BigQuery({
 
 // Helper pentru escape string SQL
 const escapeString = (value: string): string => {
-  return value.replace(/'/g, "''");
+  return value
+    .replace(/\\/g, '\\\\')  // Escape backslash first (ID-uri pot conține '\', ex: ID_Proiect "...expertiza\Rezistenta")
+    .replace(/'/g, "''");
 };
 
 // NOU: Funcție pentru recalculare progres proiect din subproiecte (04.10.2025)

@@ -53,6 +53,14 @@ function sanitizeHeaderValue(value: string): string {
     .replace(/[^\x00-\xFF]/g, '?');
 }
 
+// Escapare valori string pentru interpolare în literal SQL BigQuery (GoogleSQL).
+// CRITIC: ID-urile pot conține backslash (ex: proiect_id "Dan Broju3-...expertiza\Rezistenta"),
+// iar în GoogleSQL backslash-ul este caracter de escape. Fără escapare, "\R" produce eroarea
+// "Illegal escape sequence: \R". Escapăm \ -> \\ și ' -> \' pentru a genera literale valide.
+function escapeSqlString(value: any): string {
+  return String(value).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
 // Escapare recursivă a tuturor string-urilor dintr-un obiect de date (pentru template DOCX)
 function escapeDataForXml(data: any): any {
   if (typeof data === 'string') return escapeXml(data);
@@ -1493,7 +1501,7 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
                status_facturare, status_incasare, factura_id, 
                data_facturare, data_incasare, data_scadenta
         FROM ${TABLE_ETAPE_CONTRACT}
-        WHERE contract_id = '${contractId}' AND activ = true
+        WHERE contract_id = '${escapeSqlString(contractId)}' AND activ = true
         ORDER BY etapa_index ASC
       `;
 
@@ -1535,19 +1543,19 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
             
             const updateEtapaQuery = `
               UPDATE ${TABLE_ETAPE_CONTRACT}
-              SET 
+              SET
                 etapa_index = ${etapaIndex},
-                denumire = '${termen.denumire.replace(/'/g, "''")}',
+                denumire = '${escapeSqlString(termen.denumire)}',
                 valoare = ${termen.valoare},
-                moneda = '${termen.moneda}',
+                moneda = '${escapeSqlString(termen.moneda)}',
                 valoare_ron = ${termen.valoare_ron},
                 termen_zile = ${termen.termen_zile},
                 curs_valutar = ${cursValutarEtapa || 'NULL'},
                 data_curs_valutar = ${dataCursEtapa ? `DATE('${dataCursEtapa}')` : 'NULL'},
                 procent_din_total = ${termen.procent_calculat || 0},
-                proiect_id = '${contractInfo.proiectId}',
+                proiect_id = '${escapeSqlString(contractInfo.proiectId)}',
                 data_actualizare = CURRENT_TIMESTAMP()
-              WHERE ID_Etapa = '${etapaExistenta.ID_Etapa}'
+              WHERE ID_Etapa = '${escapeSqlString(etapaExistenta.ID_Etapa)}'
             `;
             
             queryPromises.push(bigquery.query({ query: updateEtapaQuery, location: 'EU' }));
@@ -1565,16 +1573,16 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
                curs_valutar, data_curs_valutar, procent_din_total, 
                activ, data_creare)
               VALUES (
-                '${etapaId}',
-                '${contractId}',
-                '${contractInfo.proiectId}',
+                '${escapeSqlString(etapaId)}',
+                '${escapeSqlString(contractId)}',
+                '${escapeSqlString(contractInfo.proiectId)}',
                 ${etapaIndex},
-                '${termen.denumire.replace(/'/g, "''")}',
+                '${escapeSqlString(termen.denumire)}',
                 ${termen.valoare},
-                '${termen.moneda}',
+                '${escapeSqlString(termen.moneda)}',
                 ${termen.valoare_ron},
                 ${termen.termen_zile},
-                '${termen.subproiect_id}',
+                '${escapeSqlString(termen.subproiect_id)}',
                 'Nefacturat',
                 'NeÎncasat',
                 ${cursValutarEtapa || 'NULL'},
@@ -1614,19 +1622,19 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
             
             const updateEtapaManualaQuery = `
               UPDATE ${TABLE_ETAPE_CONTRACT}
-              SET 
+              SET
                 etapa_index = ${etapaIndex},
-                denumire = '${termen.denumire.replace(/'/g, "''")}',
+                denumire = '${escapeSqlString(termen.denumire)}',
                 valoare = ${termen.valoare},
-                moneda = '${termen.moneda}',
+                moneda = '${escapeSqlString(termen.moneda)}',
                 valoare_ron = ${termen.valoare_ron},
                 termen_zile = ${termen.termen_zile},
                 curs_valutar = ${cursValutarEtapa || 'NULL'},
                 data_curs_valutar = ${dataCursEtapa ? `DATE('${dataCursEtapa}')` : 'NULL'},
                 procent_din_total = ${termen.procent_calculat || 0},
-                proiect_id = '${contractInfo.proiectId}',
+                proiect_id = '${escapeSqlString(contractInfo.proiectId)}',
                 data_actualizare = CURRENT_TIMESTAMP()
-              WHERE ID_Etapa = '${etapaExistentaManuala.ID_Etapa}'
+              WHERE ID_Etapa = '${escapeSqlString(etapaExistentaManuala.ID_Etapa)}'
             `;
             
             queryPromises.push(bigquery.query({ query: updateEtapaManualaQuery, location: 'EU' }));
@@ -1644,13 +1652,13 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
                curs_valutar, data_curs_valutar, procent_din_total, 
                activ, data_creare)
               VALUES (
-                '${etapaId}',
-                '${contractId}',
-                '${contractInfo.proiectId}',
+                '${escapeSqlString(etapaId)}',
+                '${escapeSqlString(contractId)}',
+                '${escapeSqlString(contractInfo.proiectId)}',
                 ${etapaIndex},
-                '${termen.denumire.replace(/'/g, "''")}',
+                '${escapeSqlString(termen.denumire)}',
                 ${termen.valoare},
-                '${termen.moneda}',
+                '${escapeSqlString(termen.moneda)}',
                 ${termen.valoare_ron},
                 ${termen.termen_zile},
                 NULL,
@@ -1682,7 +1690,7 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
           const deactivateQuery = `
             UPDATE ${TABLE_ETAPE_CONTRACT}
             SET activ = false, data_actualizare = CURRENT_TIMESTAMP()
-            WHERE ID_Etapa = '${etapa.ID_Etapa}'
+            WHERE ID_Etapa = '${escapeSqlString(etapa.ID_Etapa)}'
           `;
           
           queryPromises.push(bigquery.query({ query: deactivateQuery, location: 'EU' }));
@@ -1693,7 +1701,7 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
           
           const deleteQuery = `
             DELETE FROM ${TABLE_ETAPE_CONTRACT}
-            WHERE ID_Etapa = '${etapa.ID_Etapa}'
+            WHERE ID_Etapa = '${escapeSqlString(etapa.ID_Etapa)}'
           `;
           
           queryPromises.push(bigquery.query({ query: deleteQuery, location: 'EU' }));
@@ -1741,17 +1749,17 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
            procent_din_total, data_start, data_final, observatii, 
            activ, data_creare)
           VALUES (
-            '${anexaId}',
-            '${contractId}',
-            '${contractInfo.proiectId}',
+            '${escapeSqlString(anexaId)}',
+            '${escapeSqlString(contractId)}',
+            '${escapeSqlString(contractInfo.proiectId)}',
             ${anexaNumar},
             ${index + 1},
-            '${etapa.denumire.replace(/'/g, "''")}',
+            '${escapeSqlString(etapa.denumire)}',
             ${etapa.valoare},
-            '${etapa.moneda}',
+            '${escapeSqlString(etapa.moneda)}',
             ${etapa.valoare_ron},
             ${etapa.termen_zile},
-            ${etapa.subproiect_id ? `'${etapa.subproiect_id}'` : 'NULL'},
+            ${etapa.subproiect_id ? `'${escapeSqlString(etapa.subproiect_id)}'` : 'NULL'},
             'Nefacturat',
             'NeÎncasat',
             ${cursValutarEtapa || 'NULL'},
@@ -1759,7 +1767,7 @@ async function salveazaContractCuEtapeContract(contractInfo: any): Promise<strin
             ${etapa.procent_calculat || 0},
             ${contractInfo.anexaDataStart ? `DATE('${contractInfo.anexaDataStart}')` : 'NULL'},
             ${contractInfo.anexaDataFinal ? `DATE('${contractInfo.anexaDataFinal}')` : 'NULL'},
-            ${contractInfo.anexaObservatii ? `'${contractInfo.anexaObservatii.replace(/'/g, "''")}'` : 'NULL'},
+            ${contractInfo.anexaObservatii ? `'${escapeSqlString(contractInfo.anexaObservatii)}'` : 'NULL'},
             true,
             CURRENT_TIMESTAMP()
           )

@@ -24,6 +24,14 @@ const TABLE_ETAPE_CONTRACT = `\`${PROJECT_ID}.${DATASET}.EtapeContract${tableSuf
 console.log(`🔧 Calendar Data API - Tables Mode: ${useV2Tables ? 'V2 (Optimized with Partitioning)' : 'V1 (Standard)'}`);
 console.log(`📊 Using tables: Sarcini${tableSuffix}, Proiecte${tableSuffix}, SarciniResponsabili${tableSuffix}, TimeTracking${tableSuffix}, EtapeContract${tableSuffix}`);
 
+// Escapare valori string pentru literal SQL BigQuery (GoogleSQL).
+// CRITIC: ID-urile (proiect_id/ID_Proiect/ID_Etapa) pot conține backslash (ex: "...expertiza\Rezistenta"),
+// interpretat de GoogleSQL ca secvență de escape → "Illegal escape sequence: \R". Escapăm \ -> \\ și ' -> ''.
+const escapeSqlString = (value: any): string => {
+  if (value === null || value === undefined) return '';
+  return String(value).replace(/\\/g, '\\\\').replace(/'/g, "''");
+};
+
 const bigquery = new BigQuery({
   projectId: PROJECT_ID,
   credentials: {
@@ -90,7 +98,7 @@ export async function GET(request: NextRequest) {
             AND s.data_scadenta >= '${startDate}'
             AND s.data_scadenta <= '${endDate}'
             ${userId ? `AND sr.responsabil_uid = '${userId}'` : ''}
-            ${proiectId ? `AND s.proiect_id = '${proiectId}'` : ''}
+            ${proiectId ? `AND s.proiect_id = '${escapeSqlString(proiectId)}'` : ''}
           GROUP BY s.id, s.titlu, s.descriere, s.prioritate, s.status,
                    s.data_scadenta, s.data_creare, s.data_finalizare,
                    s.proiect_id, s.timp_estimat_total_ore, s.progres_procent, p.Denumire, p.Status
@@ -172,7 +180,7 @@ export async function GET(request: NextRequest) {
           AND p.Data_Final >= '${startDate}'
           AND p.Data_Final <= '${endDate}'
           AND p.Status != 'Anulat'
-          ${proiectId ? `AND p.ID_Proiect = '${proiectId}'` : ''}
+          ${proiectId ? `AND p.ID_Proiect = '${escapeSqlString(proiectId)}'` : ''}
       `;
 
       const proiecteParams = [
@@ -220,7 +228,7 @@ export async function GET(request: NextRequest) {
           AND tt.data_lucru <= '${endDate}'
           AND tt.ore_lucrate > 0
           ${userId ? `AND tt.utilizator_uid = '${userId}'` : ''}
-          ${proiectId ? `AND tt.proiect_id = '${proiectId}'` : ''}
+          ${proiectId ? `AND tt.proiect_id = '${escapeSqlString(proiectId)}'` : ''}
         GROUP BY tt.data_lucru, tt.proiect_id, p.Denumire, s.titlu, tt.utilizator_nume
         ORDER BY tt.data_lucru DESC
       `;
@@ -279,7 +287,7 @@ export async function GET(request: NextRequest) {
         AND ec.data_scadenta >= '${startDate}'
         AND ec.data_scadenta <= '${endDate}'
         AND ec.activ = true
-        ${proiectId ? `AND ec.proiect_id = '${proiectId}'` : ''}
+        ${proiectId ? `AND ec.proiect_id = '${escapeSqlString(proiectId)}'` : ''}
     `;
 
     const milestonesParams = [
@@ -380,7 +388,7 @@ export async function POST(request: NextRequest) {
         updateQuery = `
           UPDATE ${TABLE_PROIECTE}
           SET Data_Final = '${new_date}'
-          WHERE ID_Proiect = '${event_id}'
+          WHERE ID_Proiect = '${escapeSqlString(event_id)}'
         `;
         break;
 
@@ -389,7 +397,7 @@ export async function POST(request: NextRequest) {
         updateQuery = `
           UPDATE ${TABLE_ETAPE_CONTRACT}
           SET data_scadenta = '${new_date}'
-          WHERE ID_Etapa = '${milestoneId}'
+          WHERE ID_Etapa = '${escapeSqlString(milestoneId)}'
         `;
         break;
 

@@ -41,7 +41,9 @@ const bigquery = new BigQuery({
 
 // Helper function pentru escape SQL - PĂSTRAT din codul existent
 const escapeString = (value: string): string => {
-  return value.replace(/'/g, "''");
+  return value
+    .replace(/\\/g, '\\\\')  // Escape backslash first (ID-uri pot conține '\', ex: proiect_id "...expertiza\Rezistenta")
+    .replace(/'/g, "''");
 };
 
 // Helper pentru formatare DATE BigQuery - PĂSTRAT și ÎMBUNĂTĂȚIT din codul existent

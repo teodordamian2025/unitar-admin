@@ -35,7 +35,9 @@ const bigquery = new BigQuery({
 
 // Helper functions PĂSTRATE din pattern-urile existente
 const escapeString = (value: string): string => {
-  return value.replace(/'/g, "''");
+  return value
+    .replace(/\\/g, '\\\\')  // Escape backslash first (ID-uri pot conține '\', ex: proiect_id "...expertiza\Rezistenta")
+    .replace(/'/g, "''");
 };
 
 const formatDateLiteral = (dateString: string | null): string => {

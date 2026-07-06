@@ -30,7 +30,9 @@ const bigquery = new BigQuery({
 
 // Helper function pentru escape SQL
 const escapeString = (value: string): string => {
-  return value.replace(/'/g, "''");
+  return value
+    .replace(/\\/g, '\\\\')  // Escape backslash first (proiect_id poate conține '\', ex: "...expertiza\Rezistenta")
+    .replace(/'/g, "''");
 };
 
 export async function GET(request: NextRequest) {

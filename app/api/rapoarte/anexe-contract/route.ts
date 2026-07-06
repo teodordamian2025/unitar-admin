@@ -113,7 +113,9 @@ const formatDate = (date?: string | { value: string }): string => {
 
 // Helper pentru escape SQL strings - PĂSTRAT identic
 const escapeString = (value: string): string => {
-  return value.replace(/'/g, "''");
+  return value
+    .replace(/\\/g, '\\\\')  // Escape backslash first (ID-uri pot conține '\', ex: contract_id "...expertiza\Rezistenta")
+    .replace(/'/g, "''");
 };
 
 // Helper pentru formatarea datelor SQL - PĂSTRAT identic
