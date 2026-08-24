@@ -57,6 +57,16 @@ interface SyncStats {
   facturi_erori: number;
 }
 
+// Statistici calculate pe filtrul curent (returnate de /api/iapp/facturi-emise/list)
+interface FilteredStats {
+  total_facturi: number;
+  total_clienti: number;
+  valoare_totala_ron: number;
+  facturi_confirmate: number;
+  facturi_descarcate: number;
+  facturi_erori: number;
+}
+
 interface FacturaDetalii {
   pdf?: string;
   factura: {
@@ -102,6 +112,7 @@ export default function FacturiEmisePage() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [stats, setStats] = useState<SyncStats | null>(null);
+  const [filteredStats, setFilteredStats] = useState<FilteredStats | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [detalii, setDetalii] = useState<FacturaDetalii | null>(null);
   const [loadingDetalii, setLoadingDetalii] = useState(false);
@@ -143,6 +154,9 @@ export default function FacturiEmisePage() {
       if (data.success) {
         setFacturi(data.data);
         setPagination(data.pagination);
+        if (data.stats) {
+          setFilteredStats(data.stats);
+        }
       } else {
         toast.error('Eroare la incarcarea facturilor: ' + data.error);
       }
@@ -514,8 +528,8 @@ export default function FacturiEmisePage() {
           </button>
         </div>
 
-        {/* Stats Cards */}
-        {stats && (
+        {/* Stats Cards - valorile reflecta filtrul curent (filteredStats), cu fallback pe stats globale */}
+        {(filteredStats || stats) && (
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
@@ -528,12 +542,12 @@ export default function FacturiEmisePage() {
               border: '1px solid #e5e7eb',
               boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
             }}>
-              <div style={{ fontSize: '14px', color: '#6b7280' }}>Total Facturi</div>
+              <div style={{ fontSize: '14px', color: '#6b7280' }}>Total Facturi (filtrate)</div>
               <div style={{ fontSize: '24px', fontWeight: '700', color: '#1f2937', marginTop: '4px' }}>
-                {stats.total_facturi}
+                {filteredStats?.total_facturi ?? stats?.total_facturi ?? 0}
               </div>
               <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '4px' }}>
-                {stats.total_clienti} clienti
+                {filteredStats?.total_clienti ?? stats?.total_clienti ?? 0} clienti
               </div>
             </div>
 
@@ -544,9 +558,9 @@ export default function FacturiEmisePage() {
               border: '1px solid #e5e7eb',
               boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
             }}>
-              <div style={{ fontSize: '14px', color: '#6b7280' }}>Valoare Totala</div>
+              <div style={{ fontSize: '14px', color: '#6b7280' }}>Valoare Totala (filtrata)</div>
               <div style={{ fontSize: '24px', fontWeight: '700', color: '#1f2937', marginTop: '4px' }}>
-                {stats.valoare_totala_ron.toLocaleString('ro-RO', { minimumFractionDigits: 2 })} RON
+                {(filteredStats?.valoare_totala_ron ?? stats?.valoare_totala_ron ?? 0).toLocaleString('ro-RO', { minimumFractionDigits: 2 })} RON
               </div>
             </div>
 
@@ -559,9 +573,9 @@ export default function FacturiEmisePage() {
             }}>
               <div style={{ fontSize: '14px', color: '#6b7280' }}>Statusuri ANAF</div>
               <div style={{ display: 'flex', gap: '12px', marginTop: '8px', fontSize: '12px' }}>
-                <span style={{ color: '#16a34a' }}>Confirmat: {stats.facturi_confirmate}</span>
-                <span style={{ color: '#2563eb' }}>Descarcat: {stats.facturi_descarcate}</span>
-                <span style={{ color: '#dc2626' }}>Erori: {stats.facturi_erori}</span>
+                <span style={{ color: '#16a34a' }}>Confirmat: {filteredStats?.facturi_confirmate ?? stats?.facturi_confirmate ?? 0}</span>
+                <span style={{ color: '#2563eb' }}>Descarcat: {filteredStats?.facturi_descarcate ?? stats?.facturi_descarcate ?? 0}</span>
+                <span style={{ color: '#dc2626' }}>Erori: {filteredStats?.facturi_erori ?? stats?.facturi_erori ?? 0}</span>
               </div>
             </div>
 
@@ -574,7 +588,7 @@ export default function FacturiEmisePage() {
             }}>
               <div style={{ fontSize: '14px', color: '#6b7280' }}>Ultima Sincronizare</div>
               <div style={{ fontSize: '14px', color: '#1f2937', marginTop: '4px' }}>
-                {stats.ultima_sincronizare ? formatDate(stats.ultima_sincronizare) : 'Niciodata'}
+                {stats?.ultima_sincronizare ? formatDate(stats.ultima_sincronizare) : 'Niciodata'}
               </div>
             </div>
           </div>

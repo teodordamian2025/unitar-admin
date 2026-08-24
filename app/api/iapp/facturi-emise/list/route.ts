@@ -203,9 +203,15 @@ export async function GET(req: NextRequest) {
       OFFSET ${offset}
     `;
 
-    // Query count pentru total
+    // Query count + statistici agregate pe acelasi filtru (pentru cardurile din UI)
     const countQuery = `
-      SELECT COUNT(*) as total
+      SELECT
+        COUNT(*) as total,
+        COUNT(DISTINCT fe.cif_client) as total_clienti,
+        SUM(COALESCE(fe.valoare_ron, fe.valoare_totala)) as valoare_totala_ron,
+        COUNTIF(fe.status_anaf = 'CONFIRMAT') as facturi_confirmate,
+        COUNTIF(fe.status_anaf = 'DESCARCAT') as facturi_descarcate,
+        COUNTIF(fe.status_anaf = 'EROARE') as facturi_erori
       FROM \`${FACTURI_EMISE_TABLE}\` fe
       WHERE ${whereClause}
     `;
@@ -219,7 +225,8 @@ export async function GET(req: NextRequest) {
     ]);
 
     const facturi = dataRows[0] || [];
-    const total = countRows[0][0]?.total || 0;
+    const statsRow = countRows[0][0] || {};
+    const total = statsRow.total || 0;
 
     console.log(`✅ [iapp.ro Emise List] Returnate ${facturi.length} facturi (total: ${total})`);
 
@@ -231,6 +238,14 @@ export async function GET(req: NextRequest) {
         limit: limit,
         offset: offset,
         has_more: offset + limit < parseInt(total)
+      },
+      stats: {
+        total_facturi: parseInt(statsRow.total) || 0,
+        total_clienti: parseInt(statsRow.total_clienti) || 0,
+        valoare_totala_ron: parseFloat(statsRow.valoare_totala_ron) || 0,
+        facturi_confirmate: parseInt(statsRow.facturi_confirmate) || 0,
+        facturi_descarcate: parseInt(statsRow.facturi_descarcate) || 0,
+        facturi_erori: parseInt(statsRow.facturi_erori) || 0
       },
       filters: {
         data_start: dataStart,
