@@ -8,6 +8,7 @@
 
 import { useState, useEffect } from 'react';
 import ClientNouModal from '../../clienti/components/ClientNouModal';
+import { PACHET_LABELS, TIPURI_OFERTA_CU_PACHET, isPachetOferta } from '@/lib/oferte-pachete';
 
 interface Serviciu {
   denumire: string;
@@ -25,6 +26,7 @@ interface DetaliiTehnice {
   scop_expertiza?: string;
   cod_lmi?: string;
   categorie_monument?: string;
+  pachet?: string;
   grafic_plata_t1?: number;
   grafic_plata_t2?: number;
   grafic_plata_t3?: number;
@@ -161,6 +163,7 @@ export default function OfertaModal({ isOpen, onClose, onSuccess, oferta, userId
     scop_expertiza: existingDetalii.scop_expertiza || '',
     cod_lmi: existingDetalii.cod_lmi || '',
     categorie_monument: existingDetalii.categorie_monument || '',
+    pachet: existingDetalii.pachet || '',
     grafic_plata_t1: existingDetalii.grafic_plata_t1 ?? 40,
     grafic_plata_t2: existingDetalii.grafic_plata_t2 ?? 40,
     grafic_plata_t3: existingDetalii.grafic_plata_t3 ?? 20,
@@ -254,6 +257,7 @@ export default function OfertaModal({ isOpen, onClose, onSuccess, oferta, userId
         scop_expertiza: form.scop_expertiza,
         cod_lmi: form.cod_lmi,
         categorie_monument: form.categorie_monument,
+        pachet: TIPURI_OFERTA_CU_PACHET.has(form.tip_oferta) && isPachetOferta(form.pachet) ? form.pachet : undefined,
         grafic_plata_t1: form.grafic_plata_t1,
         grafic_plata_t2: form.grafic_plata_t2,
         grafic_plata_t3: form.grafic_plata_t3,
@@ -262,7 +266,7 @@ export default function OfertaModal({ isOpen, onClose, onSuccess, oferta, userId
 
       // Exclude individual detalii fields from API payload
       const { faza_proiectare, tip_cladire, regim_inaltime, material_structura, suprafata_construita,
-              structura_propusa, tip_interventie, scop_expertiza, cod_lmi, categorie_monument,
+              structura_propusa, tip_interventie, scop_expertiza, cod_lmi, categorie_monument, pachet,
               grafic_plata_t1, grafic_plata_t2, grafic_plata_t3, ...formData } = form;
 
       const url = '/api/rapoarte/oferte';
@@ -482,6 +486,22 @@ export default function OfertaModal({ isOpen, onClose, onSuccess, oferta, userId
                   <select value={form.faza_proiectare} onChange={e => handleChange('faza_proiectare', e.target.value)} style={inputStyle}>
                     {FAZA_OPTIONS[form.tip_oferta].map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                   </select>
+                </div>
+              )}
+
+              {/* Pachet (Esential / Complet / Premium) - expertiza tehnica si expertiza monument */}
+              {TIPURI_OFERTA_CU_PACHET.has(form.tip_oferta) && (
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={labelStyle}>Pachet expertiza</label>
+                  <select value={form.pachet} onChange={e => handleChange('pachet', e.target.value)} style={inputStyle}>
+                    <option value="">Nespecificat (apar toate pachetele in oferta)</option>
+                    {Object.entries(PACHET_LABELS).map(([value, label]) => (
+                      <option key={value} value={value}>{label}</option>
+                    ))}
+                  </select>
+                  <div style={{ marginTop: '4px', fontSize: '11px', color: '#7f8c8d' }}>
+                    Pachetul ales apare in oferta (Word si PDF) la Tip expertiza; se afiseaza doar investigatiile si calculele incluse in acel pachet.
+                  </div>
                 </div>
               )}
 

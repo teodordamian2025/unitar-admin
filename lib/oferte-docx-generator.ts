@@ -8,6 +8,7 @@ import JSZip from 'jszip';
 import { readFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
+import { PACHET_LABELS, PACHET_RANK, isPachetOferta, type PachetOferta } from '@/lib/oferte-pachete';
 
 const TEMPLATES_DIR = path.join(process.cwd(), 'uploads', 'oferte', 'templates');
 const MASTER_PORTFOLIO_FILE = path.join(process.cwd(), 'Oferta-portofoliu.docx');
@@ -162,6 +163,51 @@ function normalizeXmlRuns(xml: string): string {
     });
     iterations++;
   }
+  return result;
+}
+
+/**
+ * Aplica pachetul ales (Esential / Complet / Premium) in documentul DOCX:
+ *  - "Pachet Esențial / Complet / Premium" -> doar pachetul ales
+ *  - la expertiza monument se adauga " — Pachet X" dupa tipul expertizei
+ *  - alineatele marcate cu [Pachet Complet/Premium], [Premium] etc. se pastreaza
+ *    (fara marcaj) doar daca pachetul ales le include; altfel se elimina
+ * Fara pachet ales (sau valoare necunoscuta) documentul ramane neschimbat.
+ */
+function applyPachetSelection(xml: string, pachet: unknown): string {
+  if (!isPachetOferta(pachet)) return xml;
+  const label = PACHET_LABELS[pachet];
+  const chosenRank = PACHET_RANK[pachet];
+
+  let result = xml.replace(
+    /Pachet\s+Esen[tț]ial\s*\/\s*Complet\s*\/\s*Premium/g,
+    `Pachet ${label}`
+  );
+
+  result = result.replace(
+    /(<w:t[^>]*>Expertiz[aă] tehnic[aă] structural[aă] monument istoric)(<\/w:t>)/,
+    `$1 — Pachet ${label}$2`
+  );
+
+  const paragraphRegex = /<w:p[ >](?:(?!<w:p[ >])[\s\S])*?<\/w:p>/g;
+  const tagRegex = /\[([^\]<]+)\]\s*/;
+  result = result.replace(paragraphRegex, (paragraph) => {
+    const tagMatch = paragraph.match(tagRegex);
+    if (!tagMatch) return paragraph;
+
+    const names = tagMatch[1].replace(/^Pachet\s+/i, '').split('/').map(n => n.trim().toLowerCase());
+    const ranks = names.map(n => {
+      const key = (n.replace(/ț/g, 't') as PachetOferta);
+      return isPachetOferta(key) ? PACHET_RANK[key] : null;
+    });
+    // Marcaj necunoscut (nu e un marcaj de pachet) -> lasam paragraful neschimbat
+    if (ranks.length === 0 || ranks.some(r => r === null)) return paragraph;
+
+    const minRank = Math.min(...(ranks as number[]));
+    if (chosenRank >= minRank) return paragraph.replace(tagRegex, '');
+    return '';
+  });
+
   return result;
 }
 
@@ -385,6 +431,8 @@ function processOfertaPlaceholders(xml: string, data: any): string {
       `consolidare ${escapeXml(fazaText)}`
     );
   }
+
+  processed = applyPachetSelection(processed, detalii.pachet);
 
   return processed;
 }

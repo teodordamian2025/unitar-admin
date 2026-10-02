@@ -8,6 +8,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BigQuery } from '@google-cloud/bigquery';
 import { launchBrowser } from '@/lib/puppeteer-helper';
+import { PACHET_LABELS, isPachetOferta } from '@/lib/oferte-pachete';
+import { getStampilaDataUri, buildOfertaSignaturesHtml, OFERTA_SIGNATURES_CSS } from '@/lib/oferte-pdf-helpers';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -139,6 +141,7 @@ export async function POST(request: NextRequest) {
 
     // Detalii tehnice HTML
     let detaliiHtml = '';
+    if (isPachetOferta(detalii.pachet)) detaliiHtml += `<div class="detail-item"><strong>Pachet:</strong> ${PACHET_LABELS[detalii.pachet]}</div>`;
     if (detalii.faza_proiectare) detaliiHtml += `<div class="detail-item"><strong>Faza proiectare:</strong> ${detalii.faza_proiectare}</div>`;
     if (detalii.tip_cladire) detaliiHtml += `<div class="detail-item"><strong>Tip cladire:</strong> ${detalii.tip_cladire}</div>`;
     if (detalii.regim_inaltime) detaliiHtml += `<div class="detail-item"><strong>Regim inaltime:</strong> ${detalii.regim_inaltime}</div>`;
@@ -149,6 +152,8 @@ export async function POST(request: NextRequest) {
     if (detalii.cod_lmi) detaliiHtml += `<div class="detail-item"><strong>Cod LMI:</strong> ${detalii.cod_lmi}</div>`;
     if (detalii.categorie_monument) detaliiHtml += `<div class="detail-item"><strong>Categorie monument:</strong> ${detalii.categorie_monument}</div>`;
     if (detalii.structura_propusa) detaliiHtml += `<div class="detail-item"><strong>Structura propusa:</strong> ${detalii.structura_propusa}</div>`;
+
+    const stampilaSrc = await getStampilaDataUri();
 
     const htmlContent = `
       <!DOCTYPE html>
@@ -183,6 +188,7 @@ export async function POST(request: NextRequest) {
           .signatures { display: flex; justify-content: space-between; margin-top: 40px; }
           .sig-box { text-align: center; width: 40%; }
           .sig-box .line { border-top: 1px solid #333; margin-top: 40px; padding-top: 5px; font-size: 11px; }
+          ${OFERTA_SIGNATURES_CSS}
         </style>
       </head>
       <body>
@@ -262,18 +268,7 @@ export async function POST(request: NextRequest) {
         </div>
         ` : ''}
 
-        <div class="signatures">
-          <div class="sig-box">
-            <strong>Furnizor</strong>
-            <div>UNITAR PROIECT TDA SRL</div>
-            <div class="line">Semnatura si stampila</div>
-          </div>
-          <div class="sig-box">
-            <strong>Beneficiar</strong>
-            <div>${oferta.client_nume || ''}</div>
-            <div class="line">Semnatura si stampila</div>
-          </div>
-        </div>
+${buildOfertaSignaturesHtml(oferta.client_nume || '', stampilaSrc)}
 
         <div class="footer">
           Document generat automat de UNITAR PROIECT TDA SRL | contact@unitarproiect.eu | 0765 486 044

@@ -13,6 +13,8 @@ import { BigQuery } from '@google-cloud/bigquery';
 import { sendEmail, wrapEmailHTML, isValidEmail } from '@/lib/notifications/send-email';
 import { launchBrowser } from '@/lib/puppeteer-helper';
 import { generateOfertaDocx } from '@/lib/oferte-docx-generator';
+import { PACHET_LABELS, isPachetOferta } from '@/lib/oferte-pachete';
+import { getStampilaDataUri, placeStampilaInSignatureCell, buildOfertaSignaturesHtml, OFERTA_SIGNATURES_CSS, PDF_COMPLET_EXTRA_CSS } from '@/lib/oferte-pdf-helpers';
 import mammoth from 'mammoth';
 
 export const runtime = 'nodejs';
@@ -57,6 +59,7 @@ const PDF_COMPLET_STYLES = `
   strong, b { font-weight: 700; }
   em, i { font-style: italic; }
   img { max-width: 100%; height: auto; }
+  ${PDF_COMPLET_EXTRA_CSS}
 `;
 
 async function generatePdfCompletBuffer(oferta: any): Promise<Buffer | null> {
@@ -64,7 +67,7 @@ async function generatePdfCompletBuffer(oferta: any): Promise<Buffer | null> {
   try {
     const docxResult = await generateOfertaDocx(oferta);
     const mammothResult = await mammoth.convertToHtml({ buffer: docxResult.buffer });
-    const bodyHtml = mammothResult.value || '';
+    const bodyHtml = placeStampilaInSignatureCell(mammothResult.value || '', await getStampilaDataUri());
 
     const fullHtml = `<!DOCTYPE html>
 <html lang="ro"><head><meta charset="UTF-8"><title>${oferta.numar_oferta || 'Oferta'}</title><style>${PDF_COMPLET_STYLES}</style></head><body>${bodyHtml}</body></html>`;
@@ -133,11 +136,14 @@ async function generatePdfBuffer(oferta: any): Promise<Buffer | null> {
     }
 
     let detaliiHtml = '';
+    if (isPachetOferta(detalii.pachet)) detaliiHtml += `<div class="detail-item"><strong>Pachet:</strong> ${PACHET_LABELS[detalii.pachet]}</div>`;
     if (detalii.faza_proiectare) detaliiHtml += `<div class="detail-item"><strong>Faza proiectare:</strong> ${detalii.faza_proiectare}</div>`;
     if (detalii.tip_cladire) detaliiHtml += `<div class="detail-item"><strong>Tip cladire:</strong> ${detalii.tip_cladire}</div>`;
     if (detalii.regim_inaltime) detaliiHtml += `<div class="detail-item"><strong>Regim inaltime:</strong> ${detalii.regim_inaltime}</div>`;
     if (detalii.tip_interventie) detaliiHtml += `<div class="detail-item"><strong>Tip interventie:</strong> ${detalii.tip_interventie}</div>`;
     if (detalii.scop_expertiza) detaliiHtml += `<div class="detail-item"><strong>Scop expertiza:</strong> ${detalii.scop_expertiza}</div>`;
+
+    const stampilaSrc = await getStampilaDataUri();
 
     const htmlContent = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -166,6 +172,7 @@ async function generatePdfBuffer(oferta: any): Promise<Buffer | null> {
       .signatures { display: flex; justify-content: space-between; margin-top: 40px; }
       .sig-box { text-align: center; width: 40%; }
       .sig-box .line { border-top: 1px solid #333; margin-top: 40px; padding-top: 5px; font-size: 11px; }
+      ${OFERTA_SIGNATURES_CSS}
     </style></head><body>
       <div class="header">
         <h1>OFERTA DE PRET</h1>
@@ -209,10 +216,7 @@ async function generatePdfBuffer(oferta: any): Promise<Buffer | null> {
         </div>
       </div>
       ${oferta.observatii ? `<div class="section"><h3>Observatii</h3><div class="description">${oferta.observatii}</div></div>` : ''}
-      <div class="signatures">
-        <div class="sig-box"><strong>Furnizor</strong><div>UNITAR PROIECT TDA SRL</div><div class="line">Semnatura si stampila</div></div>
-        <div class="sig-box"><strong>Beneficiar</strong><div>${oferta.client_nume || ''}</div><div class="line">Semnatura si stampila</div></div>
-      </div>
+      ${buildOfertaSignaturesHtml(oferta.client_nume || '', stampilaSrc)}
       <div class="footer">Document generat automat de UNITAR PROIECT TDA SRL | contact@unitarproiect.eu | 0765 486 044</div>
     </body></html>`;
 

@@ -11,6 +11,7 @@ import { BigQuery } from '@google-cloud/bigquery';
 import mammoth from 'mammoth';
 import { launchBrowser } from '@/lib/puppeteer-helper';
 import { generateOfertaDocx, OfertaForDocx } from '@/lib/oferte-docx-generator';
+import { getStampilaDataUri, placeStampilaInSignatureCell, PDF_COMPLET_EXTRA_CSS } from '@/lib/oferte-pdf-helpers';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -69,6 +70,7 @@ const PDF_STYLES = `
   strong, b { font-weight: 700; }
   em, i { font-style: italic; }
   img { max-width: 100%; height: auto; }
+  ${PDF_COMPLET_EXTRA_CSS}
 `;
 
 export async function POST(request: NextRequest) {
@@ -102,7 +104,7 @@ export async function POST(request: NextRequest) {
     }
 
     const mammothResult = await mammoth.convertToHtml({ buffer: docxResult.buffer });
-    const bodyHtml = mammothResult.value || '';
+    const bodyHtml = placeStampilaInSignatureCell(mammothResult.value || '', await getStampilaDataUri());
 
     if (mammothResult.messages?.length) {
       console.log('[OFERTA-PDF-COMPLET] Mammoth warnings:', mammothResult.messages.map(m => m.message).join('; '));
